@@ -6,10 +6,12 @@ screen : pgzero.screen.Screen
 
 os.environ['SDL_VIDEO_CENTERED'] = '1'
 
-WIDTH = 480
-HEIGHT = 852
+WIDTH = 1500
+HEIGHT = 800
 
-background = Actor('background')
+game_state = False
+
+background = Actor('landscape1')
 background.x = WIDTH / 2
 background.y = HEIGHT / 2
 
@@ -21,15 +23,23 @@ def draw():
     background.draw()
     start.draw()
 
-def update():
-    pass
-
 def on_mouse_move(pos, rel, buttons):
-    x = pos[0]
-    y = pos[1]
-    if(start.collidepoint(x, y)):
-        start.image = 'start_yes'
-    else:
-        start.image = 'start_no'
+    if not game_state:
+        x,y = pos
+        if start.collidepoint(x, y):
+            start.image = 'start_yes'
+        else:
+            start.image = 'start_no'
 
-pgzrun.go()
+def on_mouse_down(pos, button):
+    global game_state
+    if not game_state:
+        x,y = pos
+        if start.collidepoint(x, y):
+            game_state = True
+            
+def run():
+    pgzrun.go()
+
+if __name__ == '__main__':
+    run()
