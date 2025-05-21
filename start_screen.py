@@ -1,45 +1,28 @@
-import os
-import pgzrun
-import pgzero
-from pgzero.builtins import Actor
-screen : pgzero.screen.Screen
+from game_state import game_state
+from config import WIDTH, HEIGHT
+from pgzero.builtins import Actor, keyboard
 
-os.environ['SDL_VIDEO_CENTERED'] = '1'
+background = Actor("landscape1", (WIDTH // 2, HEIGHT // 2))
 
-WIDTH = 1500
-HEIGHT = 800
+# 按钮设置
+button_pos = (WIDTH // 2, HEIGHT // 2 + 100)
+start_button = Actor("start_no", center=button_pos)
 
-game_state = False
-
-background = Actor('landscape1')
-background.x = WIDTH / 2
-background.y = HEIGHT / 2
-
-start = Actor('start_no')
-start.x = WIDTH / 2
-start.y = HEIGHT / 2 + 100
-
-def draw():
+def draw_start_screen(screen):
     background.draw()
-    start.draw()
+    start_button.draw()
+    screen.draw.text("幻影迷宫", center=(WIDTH // 2, HEIGHT // 2 - 150), fontsize=60, color="white",fontname="s")
 
-def on_mouse_move(pos, rel, buttons):
-    if not game_state:
-        x,y = pos
-        if start.collidepoint(x, y):
-            start.image = 'start_yes'
-        else:
-            start.image = 'start_no'
+def update_start_screen():
+    pass  # 暂时没有动画
 
-def on_mouse_down(pos, button):
-    global game_state
-    if not game_state:
-        x,y = pos
-        if start.collidepoint(x, y):
-            game_state = True
-            
-def run():
-    pgzrun.go()
+def handle_mouse_move(pos):
+    if start_button.collidepoint(pos):
+        start_button.image = "start_yes"
+    else:
+        start_button.image = "start_no"
 
-if __name__ == '__main__':
-    run()
+def handle_start_click(pos):
+    if start_button.collidepoint(pos):
+        return True
+    return False

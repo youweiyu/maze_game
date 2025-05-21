@@ -5,16 +5,16 @@ from pgzero.builtins import Actor, keyboard
 from pgzero.loaders import sounds
 screen : pgzero.screen.Screen
 
-import start_screen
-
+from config import WIDTH, HEIGHT
+from game_state import game_state
+from start_screen import draw_start_screen, update_start_screen, handle_mouse_move, handle_start_click
 os.environ['SDL_VIDEO_CENTERED'] = '1'
 
-WIDTH = 1500   # 设置窗口的宽度
-HEIGHT = 800   # 设置窗口的高度
 TITLE = '幻影迷宫'
+WIDTH = WIDTH
+HEIGHT = HEIGHT
 
-# 状态
-game_state = False  # 游戏状态，初始为False
+game_state = game_state
 
 # 人物
 player_frames = ['bat0', 'bat1', 'bat2', 'bat3', 'bat4']  # 人物精灵列表
@@ -25,19 +25,21 @@ player.speed = 5  # 设置人物移动速度
 
 frame_count = 0  # 帧计数器
 
-sounds. game_music.play(-1)  # 循环播放背景音乐
+# sounds. game_music.play(-1)  # 循环播放背景音乐
 
 def draw():  # 绘制模块，每帧重复执行
-    screen.clear()  
-    if not game_state:
-        start_screen.run()
-    else:
+    screen.clear()
+
+    if game_state == 'start':
+        draw_start_screen(screen)        
+    elif game_state == 'playing':
         screen.fill((255, 255, 255))  # 填充背景颜色
         player.draw()  # 绘制人物
 
 def update():  # 更新模块，每帧重复操作
-    global player_frame_index, frame_count
-    if not game_state:
+    global player_frame_index, frame_count, game_state
+
+    if game_state == 'start':
         return
 
     frame_count += 1  # 增加帧计数器
@@ -46,9 +48,14 @@ def update():  # 更新模块，每帧重复操作
         player.image = player_frames[player_frame_index]  # 更新人物精灵图像
 
 def on_mouse_move(pos, rel, buttons):  # 当鼠标移动时执行
-    pass
+    global game_state
+    if game_state == 'start':
+        handle_mouse_move(pos)
 
-def on_mouse_down(): # 当鼠标键按下时
-    pass
+def on_mouse_down(pos,button): # 当鼠标键按下时
+    global game_state
+    if game_state == 'start':
+       if handle_start_click(pos):
+           game_state = 'playing'
 
 pgzrun.go()  # 开始执行游戏
