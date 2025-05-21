@@ -49,4 +49,4 @@ def on_mouse_down(pos,button): # 当鼠标键按下时
        if handle_start_click(pos):
            game_state = 'playing'
 
-pgzrun.go()  # 开始执行游戏
+pgzrun.go()
