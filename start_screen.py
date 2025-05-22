@@ -1,7 +1,7 @@
 from config import WIDTH, HEIGHT
 from pgzero.builtins import Actor
 
-background = Actor('landscape1', (WIDTH // 2, HEIGHT // 2))
+background = Actor('start_bk', (WIDTH // 2, HEIGHT // 2))
 
 # 按钮设置
 button_pos = (WIDTH // 2, HEIGHT // 2 + 100)

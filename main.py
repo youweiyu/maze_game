@@ -20,6 +20,7 @@ frame_count = 0  # 帧计数器
 
 # sounds. game_music.play(-1)  # 循环播放背景音乐
 
+# ---------------------------------------------------------
 def draw():  # 绘制模块，每帧重复执行
     screen.clear()
 
@@ -29,6 +30,7 @@ def draw():  # 绘制模块，每帧重复执行
         screen.fill((255, 255, 255))  # 填充背景颜色
         draw_player()  # 绘制玩家
 
+# ---------------------------------------------------------
 def update():  # 更新模块，每帧重复操作
     global player_frame_index, frame_count, game_state
 
@@ -38,11 +40,13 @@ def update():  # 更新模块，每帧重复操作
     frame_count += 1  # 增加帧计数器
     update_player(frame_count)  # 更新玩家位置和动画
 
+# ---------------------------------------------------------
 def on_mouse_move(pos, rel, buttons):  # 当鼠标移动时执行
     global game_state
     if game_state == 'start':
         handle_mouse_move(pos)
 
+# ---------------------------------------------------------
 def on_mouse_down(pos,button): # 当鼠标键按下时
     global game_state
     if game_state == 'start':
