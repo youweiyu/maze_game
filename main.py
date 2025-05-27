@@ -8,6 +8,7 @@ screen : pgzero.screen.Screen
 from config import WIDTH, HEIGHT, game_state
 from start_screen import draw_start_screen, handle_mouse_move, handle_start_click
 from player import update_player, draw_player
+from map_loader import load_map, draw_map
 
 os.environ['SDL_VIDEO_CENTERED'] = '1'
 
@@ -28,7 +29,9 @@ def draw():  # 绘制模块，每帧重复执行
         draw_start_screen(screen)        
     elif game_state == 'playing':
         screen.fill((255, 255, 255))  # 填充背景颜色
+        draw_map()  # 绘制地图
         draw_player()  # 绘制玩家
+
 
 # ---------------------------------------------------------
 def update():  # 更新模块，每帧重复操作
@@ -40,17 +43,20 @@ def update():  # 更新模块，每帧重复操作
     frame_count += 1  # 增加帧计数器
     update_player(frame_count)  # 更新玩家位置和动画
 
+
 # ---------------------------------------------------------
 def on_mouse_move(pos, rel, buttons):  # 当鼠标移动时执行
     global game_state
     if game_state == 'start':
         handle_mouse_move(pos)
 
+
 # ---------------------------------------------------------
 def on_mouse_down(pos,button): # 当鼠标键按下时
     global game_state
     if game_state == 'start':
        if handle_start_click(pos):
+           load_map('maps/map1.txt')  # 加载地图
            game_state = 'playing'
 
 pgzrun.go()

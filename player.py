@@ -1,11 +1,12 @@
 from config import WIDTH, HEIGHT
 from pgzero.builtins import Actor, keyboard
+from map_loader import get_player_start
 
 player_frames = ['bat0', 'bat1', 'bat2', 'bat3', 'bat4']
 player_frame_index = 0
 player = Actor(player_frames[player_frame_index])
-player.pos = WIDTH // 2, HEIGHT // 2
 
+player.pos = get_player_start()  # 从地图加载器获取玩家起始位置
 PLAYER_SPEED = 4
 
 def update_player(frame_count):

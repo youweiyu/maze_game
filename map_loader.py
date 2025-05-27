@@ -18,14 +18,14 @@ def load_map(filename):
             y = row * TILE_SIZE + TILE_SIZE // 2
 
             if char == 'W':
-                tiles.append(Actor("wall", (x, y)))
+                tiles.append(Actor("brick", (x, y)))
             elif char == ' ':
-                tiles.append(Actor("floor", (x, y)))
+                tiles.append(Actor("map0", (x, y)))
             elif char == 'S':
-                tiles.append(Actor("start", (x, y)))
+                tiles.append(Actor("grass_start", (x, y)))
                 player_start_pos = (x, y)
             elif char == 'E':
-                tiles.append(Actor("end", (x, y)))
+                tiles.append(Actor("out", (x, y)))
 
 def draw_map():
     for tile in tiles:
