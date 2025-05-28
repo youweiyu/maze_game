@@ -1,9 +1,15 @@
+from enum import Enum, auto
+
+class GameState(Enum):
+    START = auto()
+    PLAYING = auto()
+    WIN = auto()
+
+game_state = GameState.START
+
 WIDTH = 1500
 HEIGHT = 800
 TILE_SIZE = 50
-game_state = 'start'
-
-
 
 # 地图字符说明
 MAP_CHARACTERS = {
