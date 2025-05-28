@@ -1,5 +1,5 @@
 from pgzero.builtins import Actor
-from config import TILE_SIZE
+from config import TILE_SIZE, MAP_CHARACTERS
 
 # 地图 Actor 列表
 tiles = []
@@ -17,15 +17,11 @@ def load_map(filename):
             x = col * TILE_SIZE + TILE_SIZE // 2
             y = row * TILE_SIZE + TILE_SIZE // 2
 
-            if char == 'W':
-                tiles.append(Actor("brick", (x, y)))
-            elif char == ' ':
-                tiles.append(Actor("map0", (x, y)))
-            elif char == 'S':
-                tiles.append(Actor("grass_start", (x, y)))
-                player_start_pos = (x, y)
-            elif char == 'E':
-                tiles.append(Actor("out", (x, y)))
+            if char in MAP_CHARACTERS:
+                tiles.append(Actor(MAP_CHARACTERS[char], (x, y)))
+                # 如果是起点，记录玩家起始位置
+                if MAP_CHARACTERS[char].endswith('_start'):
+                    player_start_pos = (x, y)
 
 def draw_map():
     for tile in tiles:
