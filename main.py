@@ -1,14 +1,14 @@
 import os
 import sys
 import pgzrun
-import pgzero
-from pgzero.builtins import Actor, keyboard
+import pgzero, pygame
+from pgzero.builtins import Actor, keyboard, keys
 from pgzero.loaders import sounds
 screen : pgzero.screen.Screen
 
 from config import WIDTH, HEIGHT, game_state, GameState
 from start_screen import draw_start_screen, handle_start_click
-from player import update_player, draw_player, init_player, get_player_position
+from player import update_player, draw_player, init_player, get_player_position, attack, update_wave
 from map_loader import load_map, draw_map, get_tiles
 
 os.environ['SDL_VIDEO_CENTERED'] = '1'
@@ -16,6 +16,7 @@ os.environ['SDL_VIDEO_CENTERED'] = '1'
 TITLE = '幻影迷宫'
 WIDTH = WIDTH
 HEIGHT = HEIGHT
+clock = pygame.time.Clock()
 
 game_state = game_state
 frame_count = 0  # 帧计数器
@@ -51,7 +52,7 @@ def draw():  # 绘制模块，每帧重复执行
     elif game_state == GameState.PLAYING:
         screen.fill((255, 255, 255))
         draw_map()  # 绘制地图
-        draw_player()  # 绘制玩家
+        draw_player()  # 绘制玩家和声波
     elif game_state == GameState.WIN:
         screen.fill((0, 0, 0))
         screen.draw.text('恭喜通关！', center=(WIDTH//2, HEIGHT//2), fontsize=100, color="yellow",fontname="s")
@@ -69,6 +70,7 @@ def update():  # 更新模块，每帧重复操作
 
     frame_count += 1  # 增加帧计数器
     update_player(frame_count)  # 更新玩家位置和动画
+    update_wave()  # 更新声波动画
 
     # 出口判定：判断玩家是否在出口格子上
     player_x, player_y = get_player_position()
@@ -79,6 +81,8 @@ def update():  # 更新模块，每帧重复操作
             if abs(player_x - tile.x) < 10 and abs(player_y - tile.y) < 10:
                 next_level()
                 break
+
+    clock.tick(60)
 
 
 # ---------------------------------------------------------
@@ -99,5 +103,10 @@ def on_mouse_down(pos, button): # 当鼠标键按下时
            load_level(current_level)  # 加载地图
            init_player()  # 初始化玩家位置
            game_state = GameState.PLAYING
+
+# ---------------------------------------------------------
+def on_key_down(key):
+    if game_state == GameState.PLAYING and key == keys.SPACE:
+        attack()
 
 pgzrun.go()

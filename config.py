@@ -17,13 +17,18 @@ MAP_CHARACTERS = {
 
     'G': 'map0',   # 绿色地面
     'a': 'grass_start',  # 绿色起始点
-    'b': 'grass_out' ,  # 绿色出口
+    'b': 'grass_out_close' ,  # 绿色出口关闭态
+    'g': 'grass_out_open',  # 绿色出口开启态
+
 
     'Y': 'map1',   # 黄色地面
     'c': 'yellow_start',  # 黄色起始点
-    'd': 'yellow_out',  # 黄色出口
+    'd': 'yellow_out_close',  # 黄色出口关闭态
+    'h': 'yellow_out_open',  # 黄色出口开启态
 
     'I': 'map2',   # 冰地面
     'e': 'ice_start',  # 冰起始点
-    'f': 'ice_out',  # 冰出口
+    'f': 'ice_out_close',  # 冰出口关闭态
+    'i': 'ice_out_open',  # 冰出口开启态
+
 }

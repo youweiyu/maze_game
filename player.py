@@ -10,6 +10,61 @@ player = None
 
 PLAYER_SPEED = 4
 
+# --------- 声波攻击相关 ---------
+wave_active = False
+wave_frame = 0
+wave_actor = None
+wave_direction = 'left'
+wave_tick = 0  #用于控制声波推进速度
+
+def attack():
+    global wave_active, wave_frame, wave_direction
+    if not wave_active:
+        wave_active = True
+        wave_frame = 1
+        wave_direction = player_direction
+        update_wave_actor()
+
+def update_wave_actor():
+    global wave_actor
+    dx, dy = 0, 0
+    if wave_direction == 'right':
+        dx = TILE_SIZE * 3/4 * wave_frame
+    elif wave_direction == 'left':
+        dx = -TILE_SIZE * 3/4 * wave_frame
+    elif wave_direction == 'up':
+        dy = -TILE_SIZE * 3/4 * wave_frame
+    elif wave_direction == 'down':
+        dy = TILE_SIZE * 3/4 * wave_frame
+    px, py = player.x, player.y
+    wave_actor = Actor(f'wave{wave_frame}', center=(px + dx, py + dy))
+    # 旋转图片
+    if wave_direction == 'left':
+        wave_actor.angle = 0
+    elif wave_direction == 'up':
+        wave_actor.angle = 270
+    elif wave_direction == 'right':
+        wave_actor.angle = 180
+    elif wave_direction == 'down':
+        wave_actor.angle = 90
+
+def update_wave():
+    global wave_active, wave_frame, wave_actor, wave_tick
+    if wave_active:
+        wave_tick += 1
+        if wave_tick >= 10:  # 每n帧推进一格
+            wave_frame += 1
+            wave_tick = 0
+            if wave_frame > 4:
+                wave_active = False
+                wave_actor = None
+            else:
+                update_wave_actor()
+
+def get_wave_actor():
+    return wave_actor if wave_active else None
+
+# --------- 玩家移动与动画 ---------
 def init_player():
     global player, player_frame_index, player_direction
     player_frame_index = 0
@@ -40,9 +95,11 @@ def update_player(frame_count):
         moved = True
     if keyboard.up:
         new_y -= PLAYER_SPEED
+        player_direction = 'up'
         moved = True
     if keyboard.down:
         new_y += PLAYER_SPEED
+        player_direction = 'down'
         moved = True
 
     # 边界限制
@@ -70,6 +127,9 @@ def update_player(frame_count):
 
 def draw_player():
     player.draw()
+    # 绘制声波
+    if wave_active and wave_actor:
+        wave_actor.draw()
 
 def get_player_position():
     return player.x, player.y
