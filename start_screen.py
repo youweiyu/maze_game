@@ -14,7 +14,13 @@ def draw_start_screen(screen):
 
     cursor = Actor('cursor_click', center=cursor_pos)
     cursor.draw()
-    screen.draw.text('幻 影 迷 宫', center=(WIDTH // 2, HEIGHT // 2 - 200), fontsize=120, color="white", fontname="s")
+    # 五个字分别用不同颜色
+    title = "幻影迷宫"
+    colors = ["cyan", "magenta", "gold", "lime"]
+    x0 = WIDTH // 2 - 360
+    y0 = HEIGHT // 2 - 200
+    for i, (char, color) in enumerate(zip(title, colors)):
+        screen.draw.text(char, center=(x0 + i * 240, y0), fontsize=120, color=color, fontname="s")
 
 # def update_start_screen():
 #     pass  # 暂时没有动画

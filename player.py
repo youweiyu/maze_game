@@ -26,7 +26,7 @@ def attack():
         update_wave_actor()
 
 def update_wave_actor():
-    global wave_actor
+    global wave_actor, wave_active, wave_frame
     dx, dy = 0, 0
     if wave_direction == 'right':
         dx = TILE_SIZE * 3/4 * wave_frame
@@ -37,7 +37,16 @@ def update_wave_actor():
     elif wave_direction == 'down':
         dy = TILE_SIZE * 3/4 * wave_frame
     px, py = player.x, player.y
-    wave_actor = Actor(f'wave{wave_frame}', center=(px + dx, py + dy))
+    wave_x, wave_y = px + dx, py + dy
+
+    # 检查声波是否碰到墙
+    for wx, wy in get_wall_positions():
+        if abs(wave_x - wx) < TILE_SIZE // 2 and abs(wave_y - wy) < TILE_SIZE // 2:
+            wave_active = False
+            wave_actor = None
+            return
+
+    wave_actor = Actor(f'wave{wave_frame}', center=(wave_x, wave_y))
     # 旋转图片
     if wave_direction == 'left':
         wave_actor.angle = 0
