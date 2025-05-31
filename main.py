@@ -10,6 +10,7 @@ from config import WIDTH, HEIGHT, game_state, GameState
 from start_screen import draw_start_screen, handle_start_click
 from player import update_player, draw_player, init_player, get_player_position, attack, update_wave
 from map_loader import load_map, draw_map, get_tiles
+from milk_dragon import spawn_dragons, update_dragons, draw_dragons
 
 os.environ['SDL_VIDEO_CENTERED'] = '1'
 
@@ -33,6 +34,7 @@ current_level = 0
 def load_level(level_index):
     load_map(levels[level_index])
     init_player()
+    spawn_dragons(n=10)  # 每关生成2只怪物，可调整数量
 
 def next_level():
     global current_level, game_state
@@ -53,6 +55,7 @@ def draw():  # 绘制模块，每帧重复执行
         screen.fill((255, 255, 255))
         draw_map()  # 绘制地图
         draw_player()  # 绘制玩家和声波
+        draw_dragons()  # 绘制怪物
     elif game_state == GameState.WIN:
         screen.fill((0, 0, 0))
         screen.draw.text('恭喜通关！', center=(WIDTH//2, HEIGHT//2), fontsize=100, color="yellow",fontname="s")
@@ -71,6 +74,7 @@ def update():  # 更新模块，每帧重复操作
     frame_count += 1  # 增加帧计数器
     update_player(frame_count)  # 更新玩家位置和动画
     update_wave()  # 更新声波动画
+    update_dragons(frame_count)  # 更新怪物状态
 
     # 出口判定：判断玩家是否在出口格子上
     player_x, player_y = get_player_position()
