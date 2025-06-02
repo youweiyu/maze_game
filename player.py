@@ -1,6 +1,7 @@
 from config import WIDTH, HEIGHT, TILE_SIZE
 from pgzero.builtins import Actor, keyboard
 from map_loader import get_player_start, get_wall_positions
+import pygame
 
 player_frames_left = ['bat0', 'bat1', 'bat2', 'bat3', 'bat4']
 player_frames_right = ['batr0', 'batr1', 'batr2', 'batr3', 'batr4']
@@ -47,6 +48,7 @@ def update_wave_actor():
             return
 
     wave_actor = Actor(f'wave{wave_frame}', center=(wave_x, wave_y))
+    wave_actor.rect = pygame.Rect(wave_actor.x - TILE_SIZE//2, wave_actor.y - TILE_SIZE//2, TILE_SIZE, TILE_SIZE)
     # 旋转图片
     if wave_direction == 'left':
         wave_actor.angle = 0

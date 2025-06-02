@@ -6,6 +6,8 @@ import pygame
 
 WALK_FRAMES = [f'walk_{i}' for i in range(9)]
 DRAGON_SPEED = 2
+TILE_SIZE = 50
+milk_dragons = []
 
 class MilkDragon:
     def __init__(self, pos):
@@ -15,8 +17,16 @@ class MilkDragon:
         self.direction = 'left'  # 初始向左
         self.move_tick = 0
         self.facing_right = False  # 初始朝左
+        self.alive = True
+        self.blowup_tick = 0
+        self.actor.rect = pygame.Rect(self.x - TILE_SIZE//2, self.y - TILE_SIZE//2, TILE_SIZE, TILE_SIZE)
 
     def update(self, frame_count):
+        if not self.alive:
+            self.blowup_tick += 1
+            if self.blowup_tick > 15:  # 爆炸特效持续15帧
+                self.alive = 'remove'
+            return
         # 动画帧切换
         if frame_count % 8 == 0:
             self.frame_index = (self.frame_index + 1) % len(WALK_FRAMES)
@@ -47,18 +57,20 @@ class MilkDragon:
             self.x = new_x
             self.y = new_y
             self.actor.pos = (self.x, self.y)
+            self.actor.rect.topleft = (self.x - TILE_SIZE//2, self.y - TILE_SIZE//2)  # Update rect position
         else:
             self.direction = random.choice(['left', 'right', 'up', 'down'])
             self.move_tick = 0
 
     def draw(self):
+        if not self.alive:
+            self.actor.image = 'blowup'
         if self.facing_right:
             self.actor._surf = pygame.transform.flip(self.actor._orig_surf, True, False)
         else:
             self.actor._surf = self.actor._orig_surf
         self.actor.draw()
 
-milk_dragons = []
 
 def get_ground_positions():
     # 只选择地面tile
@@ -92,3 +104,7 @@ def update_dragons(frame_count):
 def draw_dragons():
     for dragon in milk_dragons:
         dragon.draw()
+
+def  get_milk_dragons():
+    global milk_dragons
+    return milk_dragons
