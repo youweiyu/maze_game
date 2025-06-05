@@ -3,10 +3,11 @@ import random
 from player import can_move_to
 from map_loader import get_tiles
 import pygame
+from config import TILE_SIZE, Dragon_SPEED
 
 WALK_FRAMES = [f'walk_{i}' for i in range(9)]
-DRAGON_SPEED = 2
-TILE_SIZE = 50
+DRAGON_SPEED = Dragon_SPEED
+TILE_SIZE = TILE_SIZE
 milk_dragons = []
 
 class MilkDragon:

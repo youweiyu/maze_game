@@ -1,4 +1,4 @@
-from config import WIDTH, HEIGHT, TILE_SIZE
+from config import WIDTH, HEIGHT, TILE_SIZE, PLAYER_SPEED
 from pgzero.builtins import Actor, keyboard
 from map_loader import get_player_start, get_wall_positions
 import pygame
@@ -9,7 +9,7 @@ player_frame_index = 0
 player_direction = 'left'
 player = None
 
-PLAYER_SPEED = 4
+PLAYER_SPEED = PLAYER_SPEED  # 玩家移动速度
 
 # --------- 声波攻击相关 ---------
 wave_active = False

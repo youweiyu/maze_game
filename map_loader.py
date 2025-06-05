@@ -20,7 +20,9 @@ def load_map(filename):
             y = row * TILE_SIZE + TILE_SIZE // 2
 
             if char in MAP_CHARACTERS:
-                tiles.append(Actor(MAP_CHARACTERS[char], (x, y)))
+                tile = Actor(MAP_CHARACTERS[char], (x, y))
+                tile.char = char   # ★★★ 关键：保存原始地图字符
+                tiles.append(tile)
                 # 如果是起点，记录玩家起始位置
                 if MAP_CHARACTERS[char].endswith('_start'):
                     player_start_pos = (x, y)
