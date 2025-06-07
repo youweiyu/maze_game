@@ -36,13 +36,14 @@ max_lives = 4     # 生命上限
 blood_pos = None  # 当前关卡的血包位置
 coin_positions = []  # 当前关卡金币位置列表
 collected_coins = 0  # 总金币数
+wave_range = 1  # 声波攻击距离，初始为1，最大4
+bat_wave_pos = None  # 当前关卡bat_wave道具位置
 
-# --------------------------辅助函数-------------------------
 def load_level(level_index):
-    global blood_pos, coin_positions
+    global blood_pos, coin_positions, bat_wave_pos
     load_map(levels[level_index])
     init_player()
-    spawn_dragons(n=10)  # 每关生成n只怪物，可调整数量
+    spawn_dragons(n=10)
 
     # 随机生成一个血包
     tiles = get_tiles()
@@ -60,28 +61,33 @@ def load_level(level_index):
         for t in coin_tiles:
             coin_positions.append((t.x, t.y))
 
-# ---------------------------------------------------------
-def draw():  # 绘制模块，每帧重复执行
-    global game_state, current_level, player_lives, blood_pos, coin_positions, collected_coins
-    screen.clear()
+    # 随机生成一个bat_wave道具
+    if walkable_tiles:
+        bat_wave_tile = random.choice(walkable_tiles)
+        bat_wave_pos = (bat_wave_tile.x, bat_wave_tile.y)
+    else:
+        bat_wave_pos = None
 
+def draw():
+    global game_state, current_level, player_lives, blood_pos, coin_positions, collected_coins, bat_wave_pos
+    screen.clear()
     if game_state == GameState.START:
-        draw_start_screen(screen)        
+        draw_start_screen(screen)
     elif game_state == GameState.PLAYING:
         screen.fill((255, 255, 255))
-        draw_map()  # 绘制地图
-
-        # 先绘制血包和金币（确保在地图之上，玩家之下）
+        draw_map()
+        # 先绘制血包、bat_wave和金币
         if blood_pos:
             blood_actor = Actor('blood', center=blood_pos)
             blood_actor.draw()
+        if bat_wave_pos:
+            bat_wave_actor = Actor('bat_wave', center=bat_wave_pos)
+            bat_wave_actor.draw()
         for pos in coin_positions:
             coin_actor = Actor('coin', center=pos)
             coin_actor.draw()
-
-        draw_player()  # 绘制玩家和声波
-        draw_dragons()  # 绘制怪物
-
+        draw_player()
+        draw_dragons()
         # 顶部显示6个小图标
         icon_y = 25
         icon_size = 60
@@ -120,7 +126,7 @@ def draw():  # 绘制模块，每帧重复执行
 
 # ---------------------------------------------------------
 def update():  # 更新模块，每帧重复操作
-    global player_frame_index, frame_count, game_state, current_level, player_lives, blood_pos, coin_positions, collected_coins
+    global player_frame_index, frame_count, game_state, current_level, player_lives, blood_pos, coin_positions, collected_coins, bat_wave_pos, wave_range
     milk_dragons = get_milk_dragons()  # 获取当前奶龙列表
     if game_state == GameState.START or game_state == GameState.WIN:
         return
@@ -141,13 +147,20 @@ def update():  # 更新模块，每帧重复操作
     # 移除已爆炸完成的奶龙
     milk_dragons[:] = [d for d in milk_dragons if d.alive != 'remove']
 
-    # 玩家拾取血包
     player_x, player_y = get_player_position()
+    # 玩家拾取血包
     if blood_pos:
         if abs(player_x - blood_pos[0]) < TILE_SIZE//2 and abs(player_y - blood_pos[1]) < TILE_SIZE//2:
             if player_lives < max_lives:
                 player_lives += 1
             blood_pos = None
+
+    # 玩家拾取bat_wave道具
+    if bat_wave_pos:
+        if abs(player_x - bat_wave_pos[0]) < TILE_SIZE//2 and abs(player_y - bat_wave_pos[1]) < TILE_SIZE//2:
+            if wave_range < 4:
+                wave_range += 1
+            bat_wave_pos = None
 
     # 玩家拾取金币
     new_coin_positions = []
@@ -195,6 +208,22 @@ def on_mouse_down(pos, button): # 当鼠标键按下时
     if exit_button.collidepoint(pos):
         sys.exit()
 
+    # -----------测试阶段：点击顶部关卡图标切换关卡-----------
+    icon_y = 25
+    icon_size = 60
+    gap = 30
+    total_width = 6 * icon_size + 5 * gap
+    start_x = WIDTH // 2 - total_width // 2 + icon_size // 2
+    for i in range(6):
+        icon_x = start_x + i * (icon_size + gap)
+        # 以图标中心为圆心，半径30像素为点击区域
+        if (pos[0] - icon_x) ** 2 + (pos[1] - icon_y) ** 2 < 30 ** 2:
+            current_level = i
+            load_level(current_level)
+            game_state = GameState.PLAYING
+            return
+    # ------------------------------------------------------
+
     # 处理其他鼠标点击事件
     if game_state == GameState.START:
        if handle_start_click(pos):
@@ -206,6 +235,6 @@ def on_mouse_down(pos, button): # 当鼠标键按下时
 # ---------------------------------------------------------
 def on_key_down(key):
     if game_state == GameState.PLAYING and key == keys.SPACE:
-        attack()
+        attack(wave_range)  # 传递当前wave_range
 
 pgzrun.go()

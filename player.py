@@ -17,26 +17,28 @@ wave_frame = 0
 wave_actor = None
 wave_direction = 'left'
 wave_tick = 0  #用于控制声波推进速度
+wave_max_range = 1  # 新增，最大攻击距离
 
-def attack():
-    global wave_active, wave_frame, wave_direction
+def attack(wave_range=1):
+    global wave_active, wave_frame, wave_direction, wave_max_range
     if not wave_active:
         wave_active = True
         wave_frame = 1
         wave_direction = player_direction
+        wave_max_range = wave_range  # 记录本次攻击最大距离
         update_wave_actor()
 
 def update_wave_actor():
     global wave_actor, wave_active, wave_frame
     dx, dy = 0, 0
     if wave_direction == 'right':
-        dx = TILE_SIZE * 3/4 * wave_frame
+        dx = TILE_SIZE * 2/3 * wave_frame
     elif wave_direction == 'left':
-        dx = -TILE_SIZE * 3/4 * wave_frame
+        dx = -TILE_SIZE * 2/3 * wave_frame
     elif wave_direction == 'up':
-        dy = -TILE_SIZE * 3/4 * wave_frame
+        dy = -TILE_SIZE * 2/3 * wave_frame
     elif wave_direction == 'down':
-        dy = TILE_SIZE * 3/4 * wave_frame
+        dy = TILE_SIZE * 2/3 * wave_frame
     px, py = player.x, player.y
     wave_x, wave_y = px + dx, py + dy
 
@@ -60,13 +62,13 @@ def update_wave_actor():
         wave_actor.angle = 90
 
 def update_wave():
-    global wave_active, wave_frame, wave_actor, wave_tick
+    global wave_active, wave_frame, wave_actor, wave_tick, wave_max_range
     if wave_active:
         wave_tick += 1
-        if wave_tick >= 10:  # 每n帧推进一格
+        if wave_tick >= 10:
             wave_frame += 1
             wave_tick = 0
-            if wave_frame > 4:
+            if wave_frame > wave_max_range:  # 用本次攻击最大距离
                 wave_active = False
                 wave_actor = None
             else:
