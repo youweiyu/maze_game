@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import random
 import pgzrun
 import pgzero, pygame
@@ -12,6 +13,8 @@ from start_screen import draw_start_screen, handle_start_click
 from player import update_player, draw_player, init_player, get_player_position, attack, update_wave, get_wave_actor
 from map_loader import load_map, draw_map, get_tiles
 from milk_dragon import spawn_dragons, update_dragons, draw_dragons, get_milk_dragons
+from ghost import Ghost
+from boss import Boss, update_boss, draw_boss, get_boss, reset_boss
 
 os.environ['SDL_VIDEO_CENTERED'] = '1'
 
@@ -28,45 +31,60 @@ frame_count = 0  # 帧计数器
 EXIT_BUTTON_POS = (WIDTH - 50, 25)
 exit_button = Actor('exit', center=EXIT_BUTTON_POS)
 
-levels = ['maps/map1.txt', 'maps/map2.txt', 'maps/map3.txt', 'maps/map4.txt', 'maps/map5.txt', 'maps/map6.txt']
+levels = ['maps/map1.txt', 'maps/map2.txt', 'maps/map3.txt', 'maps/map4.txt', 'maps/map5.txt', 'maps/map6.txt', 'maps/boss.txt']
 current_level = 0
 
 player_lives = 3  # 初始三条命
-max_lives = 4     # 生命上限
+max_lives = 5     # 生命上限
 blood_pos = None  # 当前关卡的血包位置
 coin_positions = []  # 当前关卡金币位置列表
 collected_coins = 0  # 总金币数
 wave_range = 1  # 声波攻击距离，初始为1，最大4
 bat_wave_pos = None  # 当前关卡bat_wave道具位置
+ghost = None  # 新增：鬼魂对象
+player_attack_damage = 5  # 玩家攻击伤害
+
+win_time = None  # 记录胜利/失败时刻
+lose_time = None
 
 def load_level(level_index):
-    global blood_pos, coin_positions, bat_wave_pos
+    global blood_pos, coin_positions, bat_wave_pos, ghost
     load_map(levels[level_index])
     init_player()
-    spawn_dragons(n=10)
-
-    # 随机生成一个血包
-    tiles = get_tiles()
-    walkable_tiles = [t for t in tiles if hasattr(t, 'char') and t.char in ('G', 'Y', 'I')]
-    if walkable_tiles:
-        blood_tile = random.choice(walkable_tiles)
-        blood_pos = (blood_tile.x, blood_tile.y)
-    else:
+    if level_index == 6:  # boss关卡
+        reset_boss()
+        # boss出生在地图中心
         blood_pos = None
-
-    # 随机生成10个金币
-    coin_positions = []
-    if walkable_tiles:
-        coin_tiles = random.sample(walkable_tiles, min(10, len(walkable_tiles)))
-        for t in coin_tiles:
-            coin_positions.append((t.x, t.y))
-
-    # 随机生成一个bat_wave道具
-    if walkable_tiles:
-        bat_wave_tile = random.choice(walkable_tiles)
-        bat_wave_pos = (bat_wave_tile.x, bat_wave_tile.y)
-    else:
+        coin_positions.clear()
         bat_wave_pos = None
+        ghost = None
+    else:
+        spawn_dragons(n=10)
+        # 随机生成一个血包
+        tiles = get_tiles()
+        walkable_tiles = [t for t in tiles if hasattr(t, 'char') and t.char in ('G', 'Y', 'I')]
+        if walkable_tiles:
+            blood_tile = random.choice(walkable_tiles)
+            blood_pos = (blood_tile.x, blood_tile.y)
+        else:
+            blood_pos = None
+
+        # 随机生成10个金币
+        coin_positions = []
+        if walkable_tiles:
+            coin_tiles = random.sample(walkable_tiles, min(10, len(walkable_tiles)))
+            for t in coin_tiles:
+                coin_positions.append((t.x, t.y))
+
+        # 随机生成一个bat_wave道具
+        if walkable_tiles:
+            bat_wave_tile = random.choice(walkable_tiles)
+            bat_wave_pos = (bat_wave_tile.x, bat_wave_tile.y)
+        else:
+            bat_wave_pos = None
+
+        # 生成鬼魂
+        ghost = Ghost(get_player_position())
 
 def draw():
     global game_state, current_level, player_lives, blood_pos, coin_positions, collected_coins, bat_wave_pos
@@ -88,6 +106,9 @@ def draw():
             coin_actor.draw()
         draw_player()
         draw_dragons()
+        # 绘制鬼魂
+        if ghost and ghost.alive != 'remove':
+            ghost.draw()
         # 顶部显示6个小图标
         icon_y = 25
         icon_size = 60
@@ -116,9 +137,29 @@ def draw():
         coin_icon.draw()
         screen.draw.text(f" X {collected_coins}", midleft=(90, HEIGHT - 25), fontsize=50, color="gold", fontname="s")
 
+        if current_level == 6:
+            draw_boss(screen)
+            # boss血条
+            boss = get_boss()
+            if boss:
+                bar_w = 600
+                bar_h = 30
+                bar_x = WIDTH // 2 - bar_w // 2
+                bar_y = HEIGHT - 80
+                pygame.draw.rect(screen.surface, (80, 80, 80), (bar_x, bar_y, bar_w, bar_h), border_radius=10)
+                hp = max(0, boss.hp)
+                hp_w = int(bar_w * hp / boss.max_hp)
+                pygame.draw.rect(screen.surface, (255, 0, 0), (bar_x, bar_y, hp_w, bar_h), border_radius=10)
+                screen.draw.text(f"Boss HP: {hp}", center=(WIDTH//2, bar_y + bar_h//2), fontsize=32, color="white")
+
     elif game_state == GameState.WIN:
+        bg = Actor('start_bk', center=(WIDTH//2, HEIGHT//2))
+        bg.draw()
+        win_img = Actor('youwin', center=(WIDTH//2, HEIGHT//2))
+        win_img.draw()
+    elif game_state == GameState.GAME_OVER:
         screen.fill((0, 0, 0))
-        screen.draw.text('恭喜通关！', center=(WIDTH//2, HEIGHT//2), fontsize=100, color="yellow",fontname="s")
+        screen.draw.text('You Lose!', center=(WIDTH//2, HEIGHT//2), fontsize=100, color="red", fontname="s")
 
     # 始终绘制右上角退出按钮
     exit_button.draw()
@@ -126,15 +167,89 @@ def draw():
 
 # ---------------------------------------------------------
 def update():  # 更新模块，每帧重复操作
-    global player_frame_index, frame_count, game_state, current_level, player_lives, blood_pos, coin_positions, collected_coins, bat_wave_pos, wave_range
-    milk_dragons = get_milk_dragons()  # 获取当前奶龙列表
-    if game_state == GameState.START or game_state == GameState.WIN:
+    global player_frame_index, frame_count, game_state, current_level, player_lives, blood_pos, coin_positions, collected_coins, bat_wave_pos, wave_range, ghost
+    global win_time, lose_time
+    milk_dragons = get_milk_dragons()
+    if game_state == GameState.START:
+        win_time = None
+        lose_time = None
         return
+    if game_state == GameState.WIN:
+        if win_time is None:
+            win_time = time.time()
+        elif time.time() - win_time > 5:
+            game_state = GameState.START
+            win_time = None
+        return
+    if game_state == GameState.GAME_OVER:
+        if lose_time is None:
+            lose_time = time.time()
+        elif time.time() - lose_time > 5:
+            game_state = GameState.START
+            lose_time = None
+        return
+    frame_count += 1
+    update_player(frame_count)
+    update_wave()
+    update_dragons(frame_count)
+    # 更新鬼魂
+    if ghost and ghost.alive != 'remove':
+        ghost.update(get_player_position())
 
-    frame_count += 1  # 增加帧计数器
-    update_player(frame_count)  # 更新玩家位置和动画
-    update_wave()  # 更新声波动画
-    update_dragons(frame_count)  # 更新怪物状态
+    if current_level == 6:
+        update_boss(frame_count, get_player_position())
+        boss = get_boss()
+        # 冲击波攻击boss
+        wave = get_wave_actor()
+        if boss and wave and boss.alive:
+            # 增加受击冷却，防止一次攻击掉多次血
+            if not getattr(boss, 'hit_cooldown', 0):
+                if wave.colliderect(boss.actor):
+                    boss.hp -= player_attack_damage
+                    boss.hit_cooldown = 15  # 10帧内不能再次受击
+                    if boss.hp <= 0:
+                        boss.alive = False
+                        game_state = GameState.WIN
+            else:
+                boss.hit_cooldown -= 1
+        # 冲击波攻击boss召唤的ghost
+        if boss:
+            for g in boss.ghosts:
+                if g.alive and wave and wave.colliderect(g.actor):
+                    g.alive = False
+                    g.blowup_tick = 0
+        # 玩家碰撞fireball
+        if boss:
+            for fb in boss.fireballs:
+                if abs(fb.x - get_player_position()[0]) < TILE_SIZE//2 and abs(fb.y - get_player_position()[1]) < TILE_SIZE//2:
+                    player_lives -= 1
+                    boss.fireballs.remove(fb)
+                    if player_lives <= 0:
+                        game_state = GameState.GAME_OVER
+        # 玩家碰撞ghost
+        if boss:
+            for g in boss.ghosts:
+                if g.alive and abs(g.x - get_player_position()[0]) < TILE_SIZE//2 and abs(g.y - get_player_position()[1]) < TILE_SIZE//2:
+                    player_lives -= 1
+                    g.alive = False
+                    g.blowup_tick = 0
+                    if player_lives <= 0:
+                        game_state = GameState.GAME_OVER
+        # 玩家碰撞boss本体
+        if boss and boss.alive:
+            px, py = get_player_position()
+            if abs(boss.x - px) < TILE_SIZE//2 and abs(boss.y - py) < TILE_SIZE//2:
+                if not boss.blowup_show:  # 防止多次触发
+                    player_lives -= 1
+                    boss.hp -= 10
+                    boss.blowup_show = True
+                    boss.blowup_tick = 0
+                    if player_lives <= 0:
+                        game_state = GameState.GAME_OVER
+                    if boss.hp <= 0:
+                        boss.alive = False
+                        game_state = GameState.WIN
+        return
 
     # 冲击波攻击奶龙
     wave = get_wave_actor()
@@ -143,6 +258,7 @@ def update():  # 更新模块，每帧重复操作
             if dragon.alive and wave.colliderect(dragon.actor):
                 dragon.alive = False
                 dragon.blowup_tick = 0
+        # 鬼魂不会被攻击
 
     # 移除已爆炸完成的奶龙
     milk_dragons[:] = [d for d in milk_dragons if d.alive != 'remove']
@@ -193,6 +309,16 @@ def update():  # 更新模块，每帧重复操作
             if player_lives <= 0:
                 game_state = GameState.GAME_OVER
             break
+
+    # 玩家碰撞鬼魂
+    if ghost and ghost.alive and ghost.alive != 'remove':
+        px, py = get_player_position()
+        if abs(ghost.x - px) < TILE_SIZE//2 and abs(ghost.y - py) < TILE_SIZE//2:
+            player_lives -= 1
+            ghost.alive = False
+            ghost.blowup_tick = 0
+            if player_lives <= 0:
+                game_state = GameState.GAME_OVER
 
     clock.tick(60)
 
