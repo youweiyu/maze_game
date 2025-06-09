@@ -61,21 +61,93 @@ def update_wave_actor():
     elif wave_direction == 'down':
         wave_actor.angle = 90
 
+# 新增：多方向声波
+multi_wave_active = False
+multi_wave_dirs = []
+multi_wave_frames = {}
+multi_wave_ticks = {}
+multi_wave_max_range = 1
+
+def trigger_multi_wave(wave_range=1):
+    global multi_wave_active, multi_wave_dirs, multi_wave_frames, multi_wave_ticks, multi_wave_max_range
+    if not multi_wave_active:
+        multi_wave_active = True
+        multi_wave_dirs = ['left', 'right', 'up', 'down']
+        multi_wave_frames = {d: 1 for d in multi_wave_dirs}
+        multi_wave_ticks = {d: 0 for d in multi_wave_dirs}
+        multi_wave_max_range = wave_range
+
 def update_wave():
     global wave_active, wave_frame, wave_actor, wave_tick, wave_max_range
+    global multi_wave_active, multi_wave_dirs, multi_wave_frames, multi_wave_ticks, multi_wave_max_range
+    # 普通单方向声波
     if wave_active:
         wave_tick += 1
         if wave_tick >= 10:
             wave_frame += 1
             wave_tick = 0
-            if wave_frame > wave_max_range:  # 用本次攻击最大距离
+            if wave_frame > wave_max_range:
                 wave_active = False
                 wave_actor = None
             else:
                 update_wave_actor()
+    # 多方向声波
+    if multi_wave_active:
+        finished = True
+        for d in multi_wave_dirs:
+            multi_wave_ticks[d] += 1
+            if multi_wave_ticks[d] >= 10:
+                multi_wave_frames[d] += 1
+                multi_wave_ticks[d] = 0
+            if multi_wave_frames[d] <= multi_wave_max_range:
+                finished = False
+        if finished:
+            multi_wave_active = False
 
 def get_wave_actor():
-    return wave_actor if wave_active else None
+    # 返回单方向声波
+    if wave_active:
+        return wave_actor
+    # 返回多方向声波的所有actor列表
+    if multi_wave_active:
+        actors = []
+        px, py = player.x, player.y
+        for d in multi_wave_dirs:
+            frame = multi_wave_frames[d]
+            if frame > multi_wave_max_range:
+                continue
+            dx, dy = 0, 0
+            if d == 'right':
+                dx = TILE_SIZE * 2/3 * frame
+            elif d == 'left':
+                dx = -TILE_SIZE * 2/3 * frame
+            elif d == 'up':
+                dy = -TILE_SIZE * 2/3 * frame
+            elif d == 'down':
+                dy = TILE_SIZE * 2/3 * frame
+            wave_x, wave_y = px + dx, py + dy
+            # 检查声波是否碰到墙
+            hit_wall = False
+            for wx, wy in get_wall_positions():
+                if abs(wave_x - wx) < TILE_SIZE // 2 and abs(wave_y - wy) < TILE_SIZE // 2:
+                    hit_wall = True
+                    break
+            if hit_wall:
+                continue
+            actor = Actor(f'wave{frame}', center=(wave_x, wave_y))
+            actor.rect = pygame.Rect(actor.x - TILE_SIZE//2, actor.y - TILE_SIZE//2, TILE_SIZE, TILE_SIZE)
+            # 旋转图片
+            if d == 'left':
+                actor.angle = 0
+            elif d == 'up':
+                actor.angle = 270
+            elif d == 'right':
+                actor.angle = 180
+            elif d == 'down':
+                actor.angle = 90
+            actors.append(actor)
+        return actors if actors else None
+    return None
 
 # --------- 玩家移动与动画 ---------
 def init_player():
@@ -86,9 +158,9 @@ def init_player():
     player.pos = get_player_start()  # 每次初始化时获取最新起始位置
 
 def can_move_to(x, y):
-    # 检查目标点是否与任何墙壁重叠
+    # 检查目标点是否与任何墙壁重叠，判定略微放宽
     for wx, wy in get_wall_positions():
-        if abs(x - wx) < TILE_SIZE - 5 and abs(y - wy) < TILE_SIZE - 5:
+        if abs(x - wx) < TILE_SIZE - 15 and abs(y - wy) < TILE_SIZE - 15:
             return False
     return True
 
@@ -98,19 +170,20 @@ def update_player(frame_count):
     moved = False
     new_x, new_y = player.x, player.y
 
-    if keyboard.left:
+    # 同时支持方向键和WASD
+    if keyboard.left or keyboard.a:
         new_x -= PLAYER_SPEED
         player_direction = 'left'
         moved = True
-    if keyboard.right:
+    if keyboard.right or keyboard.d:
         new_x += PLAYER_SPEED
         player_direction = 'right'
         moved = True
-    if keyboard.up:
+    if keyboard.up or keyboard.w:
         new_y -= PLAYER_SPEED
         player_direction = 'up'
         moved = True
-    if keyboard.down:
+    if keyboard.down or keyboard.s:
         new_y += PLAYER_SPEED
         player_direction = 'down'
         moved = True
@@ -143,6 +216,12 @@ def draw_player():
     # 绘制声波
     if wave_active and wave_actor:
         wave_actor.draw()
+    # 新增：绘制多方向声波
+    if multi_wave_active:
+        actors = get_wave_actor()
+        if actors:
+            for a in actors:
+                a.draw()
 
 def get_player_position():
     return player.x, player.y

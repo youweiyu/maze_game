@@ -30,6 +30,7 @@ MAP_CHARACTERS = {
     'd': 'yellow_out_close',  # 黄色出口关闭态
     'h': 'yellow_out_open',  # 黄色出口1 
     'l': 'yellow_out_open',  # 黄色出口2
+    'k': 'map1',  # key
 
 
     'I': 'map2',   # 冰地面

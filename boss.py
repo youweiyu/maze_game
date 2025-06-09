@@ -11,19 +11,42 @@ class Fireball:
         self.dx, self.dy = dx, dy
         self.actor = Actor('fireball', center=(x, y))
         self.actor.rect = pygame.Rect(self.x - TILE_SIZE//2, self.y - TILE_SIZE//2, TILE_SIZE, TILE_SIZE)
-        # 用atan2计算精确角度，水平方向再加180度翻转
+        # 优化：火球角度严格朝向player
         import math
         angle = math.degrees(math.atan2(-dy, dx))
-        angle = (angle + 180) % 360
         self.actor.angle = angle
+        self.blowup = False
+        self.blowup_tick = 0
+        self.flip_x = dx > 0
 
     def update(self):
+        if self.blowup:
+            self.blowup_tick += 1
+            if self.blowup_tick > 10:
+                self.to_remove = True
+            return
         self.x += self.dx
         self.y += self.dy
         self.actor.pos = (self.x, self.y)
         self.actor.rect.topleft = (self.x - TILE_SIZE//2, self.y - TILE_SIZE//2)
+        # 火球不能穿墙
+        from map_loader import get_wall_positions
+        for wx, wy in get_wall_positions():
+            if abs(self.x - wx) < TILE_SIZE//2 and abs(self.y - wy) < TILE_SIZE//2:
+                self.blowup = True
+                self.blowup_tick = 0
+                self.actor.image = 'blowup'
+                return
 
     def draw(self):
+        if self.blowup:
+            self.actor.image = 'blowup'
+        else:
+            self.actor.image = 'fireball'
+        if self.flip_x:
+            self.actor._surf = pygame.transform.flip(self.actor._orig_surf, True, False)
+        else:
+            self.actor._surf = self.actor._orig_surf
         self.actor.draw()
 
 def can_move_to(x, y):
@@ -56,21 +79,24 @@ class Boss:
         self.blowup_tick = 0
         self.blowup_show = False
         self.hit_cooldown = 0  # 新增：受击冷却
+        self.facing_right = False  # 新增：朝向
 
     def update(self, frame_count, player_pos):
         if not self.alive:
             return
         # 随机移动
         self.move_tick += 1
-        speed = 1
+        speed = 2
         if self.move_tick > 30:
             self.move_dir = random.choice(['left', 'right', 'up', 'down'])
             self.move_tick = 0
         dx, dy = 0, 0
         if self.move_dir == 'left':
             dx = -speed
+            self.facing_right = False  # 向左
         elif self.move_dir == 'right':
             dx = speed
+            self.facing_right = True   # 向右
         elif self.move_dir == 'up':
             dy = -speed
         elif self.move_dir == 'down':
@@ -102,21 +128,25 @@ class Boss:
         else:
             self.ghost_cd = max(0, self.ghost_cd - 1)
         # 发射fireball
-        if self.fireball_cd <= 0 and self.skill_tick % 90 == 0:
+        if self.fireball_cd <= 0 and self.skill_tick % 60 == 0:
             px, py = player_pos
             dx = px - self.x
             dy = py - self.y
             dist = max(1, (dx ** 2 + dy ** 2) ** 0.5)
             speed_fb = 5
+            # 优化：dx,dy严格指向player
             fb = Fireball(self.x, self.y, speed_fb * dx / dist, speed_fb * dy / dist)
             self.fireballs.append(fb)
-            self.fireball_cd = 90
+            self.fireball_cd = 60
         else:
             self.fireball_cd = max(0, self.fireball_cd - 1)
         # 更新fireball
         for fb in self.fireballs[:]:
             fb.update()
-            if not (0 <= fb.x <= WIDTH and 0 <= fb.y <= HEIGHT):
+            # 火球出界或被墙阻挡都移除
+            if hasattr(fb, 'to_remove') and fb.to_remove:
+                self.fireballs.remove(fb)
+            elif not (0 <= fb.x <= WIDTH and 0 <= fb.y <= HEIGHT):
                 self.fireballs.remove(fb)
         # 更新ghost
         for g in self.ghosts[:]:
@@ -139,8 +169,14 @@ class Boss:
             return
         if self.blowup_show:
             self.actor.image = 'blowup'
+            self.actor._surf = self.actor._orig_surf
         else:
             self.actor.image = 'boss'
+            # 新增：向右时水平翻转
+            if self.facing_right:
+                self.actor._surf = pygame.transform.flip(self.actor._orig_surf, True, False)
+            else:
+                self.actor._surf = self.actor._orig_surf
         self.actor.draw()
         for g in self.ghosts:
             g.draw()
