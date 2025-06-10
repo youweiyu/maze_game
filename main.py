@@ -327,22 +327,21 @@ def draw():
     elif game_state == GameState.WIN:
         bg = Actor('start_bk', center=(WIDTH//2, HEIGHT//2))
         bg.draw()
-        win_img = Actor('youwin', center=(WIDTH//2, HEIGHT//2))
+        win_img = Actor('youwin', center=(WIDTH//2, HEIGHT//2 - 70))
         win_img.draw()
         # 新增：胜利时提示
-        screen.draw.text("按空格键返回主界面", center=(WIDTH//2, HEIGHT//2+200), fontsize=60, color="white", fontname="s")
+        screen.draw.text("按空格键返回主界面", center=(WIDTH//2, HEIGHT//2+250), fontsize=60, color="white", fontname="s")
     elif game_state == GameState.GAME_OVER:
         screen.fill((0, 0, 0))
         bg = Actor('start_bk', center=(WIDTH//2, HEIGHT//2))
         bg.draw()
-        screen.draw.text('You Lose!', center=(WIDTH//2, HEIGHT//2), fontsize=100, color="red", fontname="s")
+        screen.draw.text('You Lose!', center=(WIDTH//2, HEIGHT//2 - 50), fontsize=180, color="red", fontname="s")
         # 新增：失败时提示
         screen.draw.text("按空格键返回主界面", center=(WIDTH//2, HEIGHT//2+120), fontsize=60, color="white", fontname="s")
 
     # 始终绘制右上角退出按钮和暂停按钮
     exit_button.draw()
     stop_btn.draw()
-
 
 # ---------------------------------------------------------
 def update():  # 更新模块，每帧重复操作
