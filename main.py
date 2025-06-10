@@ -70,6 +70,8 @@ power_bought = False
 power_count = 0
 power_show_tick = 0  # “已购买”提示计时
 
+player_invincible_tick = 0  # 新增：玩家无敌帧计数
+
 def reset_game_state():
     global player_lives, collected_coins, wave_range, current_level, blood_pos, coin_positions, bat_wave_pos, ghost, ghost_hurt_cooldown
     global key_pos, has_key, level_item_cache, power_bought, attack_bought, player_attack_damage, attack_level, attack_show_tick, power_count, power_show_tick
@@ -107,7 +109,7 @@ def load_level(level_index):
         bat_wave_pos = None
         ghost = None
         key_pos = None
-        # boss关卡不重置玩家位置
+        init_player()
     else:
         # --------- 只生成一次道具，缓存到level_item_cache ----------
         if level_index not in level_item_cache:
@@ -258,6 +260,7 @@ def draw():
 def update():  # 更新模块，每帧重复操作
     global player_frame_index, frame_count, game_state, current_level, player_lives, blood_pos, coin_positions, collected_coins, bat_wave_pos, wave_range, ghost, ghost_hurt_cooldown
     global win_time, lose_time, key_pos, has_key, attack_show_tick, power_show_tick
+    global player_invincible_tick
 
     # 1. 先处理游戏状态（START/WIN/GAME_OVER），如需 return 则直接返回
     if game_state == GameState.START:
@@ -289,6 +292,16 @@ def update():  # 更新模块，每帧重复操作
     if ghost and ghost.alive != 'remove':
         ghost.update(get_player_position())
 
+    # 新增：已购买提示倒计时
+    if attack_show_tick > 0:
+        attack_show_tick -= 1
+    if power_show_tick > 0:
+        power_show_tick -= 1
+
+    # 新增：无敌帧倒计时
+    if player_invincible_tick > 0:
+        player_invincible_tick -= 1
+
     # 3. boss关卡判定
     if current_level == 6:
         update_boss(frame_count, get_player_position())
@@ -296,8 +309,18 @@ def update():  # 更新模块，每帧重复操作
         wave = get_wave_actor()
         if boss and wave and boss.alive:
             bx, by = boss.x, boss.y
+            # 修复：支持wave为list和单个actor
             if boss.hit_cooldown <= 0:
-                if ((wave.x - bx) ** 2 + (wave.y - by) ** 2) ** 0.5 < 3 * TILE_SIZE:
+                hit = False
+                if isinstance(wave, list):
+                    for w in wave:
+                        if ((w.x - bx) ** 2 + (w.y - by) ** 2) ** 0.5 < 3 * TILE_SIZE:
+                            hit = True
+                            break
+                else:
+                    if ((wave.x - bx) ** 2 + (wave.y - by) ** 2) ** 0.5 < 3 * TILE_SIZE:
+                        hit = True
+                if hit:
                     boss.hp -= player_attack_damage
                     boss.hit_cooldown = 25
                     if boss.hp <= 0:
@@ -307,16 +330,30 @@ def update():  # 更新模块，每帧重复操作
                 boss.hit_cooldown -= 1
         if boss:
             for g in boss.ghosts:
-                if g.alive and wave and wave.colliderect(g.actor):
-                    g.alive = False
-                    g.blowup_tick = 0
+                # 修复：支持wave为list和单个actor
+                if g.alive and wave:
+                    if isinstance(wave, list):
+                        for w in wave:
+                            if w.colliderect(g.actor):
+                                g.alive = False
+                                g.blowup_tick = 0
+                                break
+                    else:
+                        if wave.colliderect(g.actor):
+                            g.alive = False
+                            g.blowup_tick = 0
         if boss:
             for fb in boss.fireballs:
-                if abs(fb.x - get_player_position()[0]) < TILE_SIZE//2 and abs(fb.y - get_player_position()[1]) < TILE_SIZE//2:
-                    player_lives -= 1
-                    boss.fireballs.remove(fb)
-                    if player_lives <= 0:
-                        game_state = GameState.GAME_OVER
+                # 只在火球未爆炸时判定伤害
+                if not getattr(fb, 'blowup', False):
+                    if abs(fb.x - get_player_position()[0]) < TILE_SIZE//2 and abs(fb.y - get_player_position()[1]) < TILE_SIZE//2:
+                        player_lives -= 1
+                        # 新增：火球爆炸特效
+                        fb.blowup = True
+                        fb.blowup_tick = 0
+                        # boss.fireballs.remove(fb)  # 不要立即移除，等爆炸动画
+                        if player_lives <= 0:
+                            game_state = GameState.GAME_OVER
         if boss:
             for g in boss.ghosts:
                 if g.alive and abs(g.x - get_player_position()[0]) < TILE_SIZE//2 and abs(g.y - get_player_position()[1]) < TILE_SIZE//2:
@@ -329,7 +366,7 @@ def update():  # 更新模块，每帧重复操作
         if boss and boss.alive and not boss.blowup_show:
             px, py = get_player_position()
             # 判定范围扩大到TILE_SIZE
-            if abs(boss.x - px) < 3 * TILE_SIZE and abs(boss.y - py) < 3 * TILE_SIZE:
+            if player_invincible_tick == 0 and abs(boss.x - px) < 2.5 * TILE_SIZE and abs(boss.y - py) < 2.5 * TILE_SIZE:
                 player_lives -= 1
                 boss.hp -= 10
                 boss.blowup_show = True
@@ -338,6 +375,7 @@ def update():  # 更新模块，每帧重复操作
                 if not hasattr(boss, 'player_blowup_tick'):
                     boss.player_blowup_tick = 0
                 boss.player_blowup_tick = 15  # 显示15帧
+                player_invincible_tick = 120  # 2秒无敌
                 if player_lives <= 0:
                     game_state = GameState.GAME_OVER
                 if boss.hp <= 0:
@@ -475,8 +513,8 @@ def on_mouse_down(pos, button):
         return
     # 大招按钮
     if power_btn.collidepoint(pos):
-        if collected_coins >= 20:
-            collected_coins -= 20
+        if collected_coins >= 0:
+            collected_coins -= 0
             power_bought = True
             power_count += 1
             power_show_tick = 60
@@ -524,12 +562,22 @@ def trigger_boss_wave():
     trigger_multi_wave(wave_range)
 
 def on_key_down(key):
-    global collected_coins, power_bought, power_count
+    global collected_coins, power_bought, power_count, current_level, game_state
+    global win_time
     if game_state == GameState.PLAYING and key == keys.SPACE:
         attack(wave_range)
     # 按J释放大招（需已购买且有次数）
     if game_state == GameState.PLAYING and key == keys.J:
         if power_bought and power_count > 0:
             trigger_power()
+    # 测试：按P直接进入boss关
+    if key == keys.P:
+        current_level = 6
+        load_level(current_level)
+        game_state = GameState.PLAYING
+    # 测试：按O直接获胜
+    if key == keys.O:
+        game_state = GameState.WIN
+        win_time = time.time()
 
 pgzrun.go()

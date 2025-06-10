@@ -63,7 +63,8 @@ def update_wave_actor():
 
 # 新增：多方向声波
 multi_wave_active = False
-multi_wave_dirs = []
+# 八方向
+multi_wave_dirs = ['left', 'right', 'up', 'down', 'upleft', 'upright', 'downleft', 'downright']
 multi_wave_frames = {}
 multi_wave_ticks = {}
 multi_wave_max_range = 1
@@ -72,7 +73,8 @@ def trigger_multi_wave(wave_range=1):
     global multi_wave_active, multi_wave_dirs, multi_wave_frames, multi_wave_ticks, multi_wave_max_range
     if not multi_wave_active:
         multi_wave_active = True
-        multi_wave_dirs = ['left', 'right', 'up', 'down']
+        # 八方向
+        multi_wave_dirs = ['left', 'right', 'up', 'down', 'upleft', 'upright', 'downleft', 'downright']
         multi_wave_frames = {d: 1 for d in multi_wave_dirs}
         multi_wave_ticks = {d: 0 for d in multi_wave_dirs}
         multi_wave_max_range = wave_range
@@ -117,6 +119,7 @@ def get_wave_actor():
             if frame > multi_wave_max_range:
                 continue
             dx, dy = 0, 0
+            # 八方向位移
             if d == 'right':
                 dx = TILE_SIZE * 2/3 * frame
             elif d == 'left':
@@ -125,6 +128,18 @@ def get_wave_actor():
                 dy = -TILE_SIZE * 2/3 * frame
             elif d == 'down':
                 dy = TILE_SIZE * 2/3 * frame
+            elif d == 'upleft':
+                dx = -TILE_SIZE * 2/3 * frame / 1.414
+                dy = -TILE_SIZE * 2/3 * frame / 1.414
+            elif d == 'upright':
+                dx = TILE_SIZE * 2/3 * frame / 1.414
+                dy = -TILE_SIZE * 2/3 * frame / 1.414
+            elif d == 'downleft':
+                dx = -TILE_SIZE * 2/3 * frame / 1.414
+                dy = TILE_SIZE * 2/3 * frame / 1.414
+            elif d == 'downright':
+                dx = TILE_SIZE * 2/3 * frame / 1.414
+                dy = TILE_SIZE * 2/3 * frame / 1.414
             wave_x, wave_y = px + dx, py + dy
             # 检查声波是否碰到墙
             hit_wall = False
@@ -145,6 +160,14 @@ def get_wave_actor():
                 actor.angle = 180
             elif d == 'down':
                 actor.angle = 90
+            elif d == 'upleft':
+                actor.angle = 315
+            elif d == 'upright':
+                actor.angle = 225
+            elif d == 'downleft':
+                actor.angle = 45
+            elif d == 'downright':
+                actor.angle = 135
             actors.append(actor)
         return actors if actors else None
     return None

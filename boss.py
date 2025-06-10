@@ -168,7 +168,7 @@ class Boss:
         if not self.alive:
             return
         if self.blowup_show:
-            self.actor.image = 'blowup'
+            self.actor.image = 'boss_blowup'
             self.actor._surf = self.actor._orig_surf
         else:
             self.actor.image = 'boss'
