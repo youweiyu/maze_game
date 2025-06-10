@@ -124,7 +124,7 @@ def load_level(level_index):
             # 随机生成10个金币
             _coin_positions = []
             if walkable_tiles:
-                coin_tiles = random.sample(walkable_tiles, min(10, len(walkable_tiles)))
+                coin_tiles = random.sample(walkable_tiles, min(15, len(walkable_tiles)))
                 for t in coin_tiles:
                     _coin_positions.append((t.x, t.y))
             # 随机生成一个bat_wave道具
@@ -228,7 +228,7 @@ def draw():
         # 左侧按钮
         # “消耗5”/“消耗20”一行，字体小一点
         screen.draw.text("消耗5", center=(ATTACK_BTN_POS[0], ATTACK_BTN_POS[1]-50), fontsize=17, color="gold", fontname="s")
-        screen.draw.text("消耗20", center=(POWER_BTN_POS[0], POWER_BTN_POS[1]-50), fontsize=17, color="gold", fontname="s")
+        screen.draw.text("消耗3", center=(POWER_BTN_POS[0], POWER_BTN_POS[1]-50), fontsize=17, color="gold", fontname="s")
         attack_btn.draw()
         power_btn.draw()
         # 攻击力等级
@@ -513,9 +513,13 @@ def on_mouse_down(pos, button):
         return
     # 大招按钮
     if power_btn.collidepoint(pos):
-        if collected_coins >= 0:
-            collected_coins -= 0
+        # 购买大招时消耗3金币，释放时不再消耗
+        if not power_bought and collected_coins >= 3:
+            collected_coins -= 3
             power_bought = True
+            power_count += 1
+            power_show_tick = 60
+        elif power_bought:
             power_count += 1
             power_show_tick = 60
         return
@@ -549,16 +553,11 @@ def trigger_power():
     if not power_bought or power_count <= 0:
         return  # 未购买或无次数不能释放
     power_count -= 1
-    if current_level == 6:
-        trigger_boss_wave()
-    else:
-        for dragon in get_milk_dragons():
-            if dragon.alive:
-                dragon.alive = False
-                dragon.blowup_tick = 0
+    # 普通关卡和boss关卡都触发八方向AOE
+    trigger_multi_wave(wave_range)
 
 def trigger_boss_wave():
-    # 在boss关卡，j键/大招按钮触发四方向声波
+    # boss关卡，j键/大招按钮触发八方向声波
     trigger_multi_wave(wave_range)
 
 def on_key_down(key):
