@@ -2,6 +2,8 @@ from enum import Enum, auto
 
 class GameState(Enum):
     START = auto()
+    INTRO = auto()
+    PAUSE = auto()
     PLAYING = auto()
     WIN = auto()
     GAME_OVER = auto()

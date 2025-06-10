@@ -190,6 +190,10 @@ def can_move_to(x, y):
 def update_player(frame_count):
     global player_frame_index, player_direction
 
+    # 修复：player未初始化时直接返回，避免NoneType错误
+    if player is None:
+        return
+
     moved = False
     new_x, new_y = player.x, player.y
 

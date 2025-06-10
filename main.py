@@ -4,17 +4,17 @@ import time
 import random
 import pgzrun
 import pgzero, pygame
-from pgzero.builtins import Actor, keyboard, keys
+from pgzero.builtins import Actor, keys
 from pgzero.loaders import sounds
 screen : pgzero.screen.Screen
 
 from config import WIDTH, HEIGHT, game_state, GameState, EXIT_JUMP, TILE_SIZE
-from start_screen import draw_start_screen, handle_start_click
+from start_screen import draw_start_screen, handle_start_click, draw_intro_screen
 from player import update_player, draw_player, init_player, get_player_position, attack, update_wave, get_wave_actor, trigger_multi_wave
 from map_loader import load_map, draw_map, get_tiles
 from milk_dragon import spawn_dragons, update_dragons, draw_dragons, get_milk_dragons, milk_dragons
 from ghost import Ghost
-from boss import Boss, update_boss, draw_boss, get_boss, reset_boss
+from boss import update_boss, draw_boss, get_boss, reset_boss
 
 os.environ['SDL_VIDEO_CENTERED'] = '1'
 
@@ -28,8 +28,12 @@ frame_count = 0  # 帧计数器
 
 # sounds. game_music.play(-1)  # 循环播放背景音乐
 
-EXIT_BUTTON_POS = (WIDTH - 50, 25)
+EXIT_BUTTON_POS = (WIDTH - 60, 25)
 exit_button = Actor('exit', center=EXIT_BUTTON_POS)
+
+# 新增暂停按钮
+STOP_BTN_POS = (WIDTH - 180, 25)
+stop_btn = Actor('stop', center=STOP_BTN_POS)
 
 levels = ['maps/map1.txt', 'maps/map2.txt', 'maps/map3.txt', 'maps/map4.txt', 'maps/map5.txt', 'maps/map6.txt', 'maps/boss.txt']
 current_level = 0
@@ -161,6 +165,85 @@ def draw():
     screen.clear()
     if game_state == GameState.START:
         draw_start_screen(screen)
+    elif getattr(GameState, "INTRO", None) and game_state == GameState.INTRO:
+        draw_intro_screen(screen)
+    elif getattr(GameState, "PAUSE", None) and game_state == GameState.PAUSE:
+        # 暂停时先绘制游戏画面
+        screen.fill((255, 255, 255))
+        draw_map()
+        if blood_pos:
+            blood_actor = Actor('blood', center=blood_pos)
+            blood_actor.draw()
+        if bat_wave_pos:
+            bat_wave_actor = Actor('bat_wave', center=bat_wave_pos)
+            bat_wave_actor.draw()
+        if key_pos and not has_key:
+            key_actor = Actor('key', center=key_pos)
+            key_actor.draw()
+        for pos in coin_positions:
+            coin_actor = Actor('coin', center=pos)
+            coin_actor.draw()
+        tiles = get_tiles()
+        for tile in tiles:
+            if hasattr(tile, 'char') and tile.char == 'f':
+                door_img = 'ice_out_open' if has_key else 'ice_out_close'
+                door_actor = Actor(door_img, center=(tile.x, tile.y))
+                door_actor.draw()
+        draw_player()
+        if current_level != 6:
+            draw_dragons()
+        if ghost and ghost.alive != 'remove':
+            ghost.draw()
+        icon_y = 25
+        icon_size = 60
+        gap = 30
+        total_width = 6 * icon_size + 5 * gap
+        start_x = WIDTH // 2 - total_width // 2 + icon_size // 2
+        for i in range(6):
+            icon_name = f"side{i+1}"
+            icon_x = start_x + i * (icon_size + gap)
+            if current_level == i:
+                icon = Actor(icon_name, center=(icon_x, icon_y))
+            else:
+                icon = Actor(icon_name, center=(icon_x, icon_y))
+                icon._surf = pygame.transform.smoothscale(icon._orig_surf, (40, 40))
+            icon.draw()
+        for i in range(player_lives):
+            life_icon = Actor('bat', center=(50 + i * 80, 25))
+            life_icon.draw()
+        coin_icon = Actor('coin', center=(70, HEIGHT - 25))
+        coin_icon.draw()
+        screen.draw.text(f" X {collected_coins}", midleft=(90, HEIGHT - 25), fontsize=50, color="gold", fontname="s")
+        if current_level == 6:
+            draw_boss(screen)
+            boss = get_boss()
+            if boss:
+                bar_w = 600
+                bar_h = 30
+                bar_x = WIDTH // 2 - bar_w // 2
+                bar_y = HEIGHT - 80
+                pygame.draw.rect(screen.surface, (80, 80, 80), (bar_x, bar_y, bar_w, bar_h), border_radius=10)
+                hp = max(0, boss.hp)
+                hp_w = int(bar_w * hp / boss.max_hp)
+                pygame.draw.rect(screen.surface, (255, 0, 0), (bar_x, bar_y, hp_w, bar_h), border_radius=10)
+                screen.draw.text(f"Boss HP: {hp}", center=(WIDTH//2, bar_y + bar_h//2), fontsize=32, color="white")
+        screen.draw.text("消耗5", center=(ATTACK_BTN_POS[0], ATTACK_BTN_POS[1]-50), fontsize=17, color="gold", fontname="s")
+        screen.draw.text("消耗5", center=(POWER_BTN_POS[0], POWER_BTN_POS[1]-50), fontsize=17, color="gold", fontname="s")
+        attack_btn.draw()
+        power_btn.draw()
+        screen.draw.text(f"Lv.{attack_level}", center=(ATTACK_BTN_POS[0], ATTACK_BTN_POS[1]+45), fontsize=28, color="gold", fontname="s")
+        screen.draw.text(f"{power_count}", center=(POWER_BTN_POS[0], POWER_BTN_POS[1]+45), fontsize=28, color="gold", fontname="s")
+        screen.draw.text("J释放", center=(POWER_BTN_POS[0], POWER_BTN_POS[1]+80), fontsize=24, color="gold", fontname="s")
+        if attack_show_tick > 0:
+            screen.draw.text("已购买", center=(ATTACK_BTN_POS[0]+80, ATTACK_BTN_POS[1]), fontsize=32, color="#1a67aa", fontname="s")
+        if power_show_tick > 0:
+            screen.draw.text("已购买", center=(POWER_BTN_POS[0]+80, POWER_BTN_POS[1]), fontsize=32, color="#1a67aa", fontname="s")
+        # 在游戏画面上覆盖暂停提示
+        s = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        s.fill((0, 0, 0, 120))  # 半透明黑色遮罩
+        screen.surface.blit(s, (0, 0))
+        screen.draw.text("游戏已暂停", center=(WIDTH//2, HEIGHT//2-40), fontsize=80, color="yellow", fontname="s")
+        screen.draw.text("按空格键继续游戏", center=(WIDTH//2, HEIGHT//2+40), fontsize=50, color="white", fontname="s")
     elif game_state == GameState.PLAYING:
         screen.fill((255, 255, 255))
         # 1. 先绘制地图底层
@@ -228,7 +311,7 @@ def draw():
         # 左侧按钮
         # “消耗5”/“消耗20”一行，字体小一点
         screen.draw.text("消耗5", center=(ATTACK_BTN_POS[0], ATTACK_BTN_POS[1]-50), fontsize=17, color="gold", fontname="s")
-        screen.draw.text("消耗3", center=(POWER_BTN_POS[0], POWER_BTN_POS[1]-50), fontsize=17, color="gold", fontname="s")
+        screen.draw.text("消耗5", center=(POWER_BTN_POS[0], POWER_BTN_POS[1]-50), fontsize=17, color="gold", fontname="s")
         attack_btn.draw()
         power_btn.draw()
         # 攻击力等级
@@ -246,14 +329,19 @@ def draw():
         bg.draw()
         win_img = Actor('youwin', center=(WIDTH//2, HEIGHT//2))
         win_img.draw()
+        # 新增：胜利时提示
+        screen.draw.text("按空格键返回主界面", center=(WIDTH//2, HEIGHT//2+200), fontsize=60, color="white", fontname="s")
     elif game_state == GameState.GAME_OVER:
         screen.fill((0, 0, 0))
         bg = Actor('start_bk', center=(WIDTH//2, HEIGHT//2))
         bg.draw()
         screen.draw.text('You Lose!', center=(WIDTH//2, HEIGHT//2), fontsize=100, color="red", fontname="s")
+        # 新增：失败时提示
+        screen.draw.text("按空格键返回主界面", center=(WIDTH//2, HEIGHT//2+120), fontsize=60, color="white", fontname="s")
 
-    # 始终绘制右上角退出按钮
+    # 始终绘制右上角退出按钮和暂停按钮
     exit_button.draw()
+    stop_btn.draw()
 
 
 # ---------------------------------------------------------
@@ -262,25 +350,20 @@ def update():  # 更新模块，每帧重复操作
     global win_time, lose_time, key_pos, has_key, attack_show_tick, power_show_tick
     global player_invincible_tick
 
-    # 1. 先处理游戏状态（START/WIN/GAME_OVER），如需 return 则直接返回
+    # 1. 先处理游戏状态（START/WIN/GAME_OVER/INTRO/PAUSE），如需 return 则直接返回
     if game_state == GameState.START:
         win_time = None
         lose_time = None
         reset_game_state()
         return
+    if getattr(GameState, "INTRO", None) and game_state == GameState.INTRO:
+        return
+    if getattr(GameState, "PAUSE", None) and game_state == GameState.PAUSE:
+        return
+    # 修改：WIN和GAME_OVER状态下不再自动返回主界面
     if game_state == GameState.WIN:
-        if win_time is None:
-            win_time = time.time()
-        elif time.time() - win_time > 3:
-            game_state = GameState.START
-            win_time = None
         return
     if game_state == GameState.GAME_OVER:
-        if lose_time is None:
-            lose_time = time.time()
-        elif time.time() - lose_time > 3:
-            game_state = GameState.START
-            lose_time = None
         return
 
     # 2. 递增帧数，更新玩家、声波、怪物、鬼魂
@@ -502,20 +585,25 @@ def on_mouse_down(pos, button):
     # 检查是否点击退出按钮
     if exit_button.collidepoint(pos):
         sys.exit()
+    # 检查是否点击暂停按钮
+    if stop_btn.collidepoint(pos):
+        if game_state == GameState.PLAYING:
+            game_state = GameState.PAUSE
+        return
     # 攻击按钮
     if attack_btn.collidepoint(pos):
         if collected_coins >= 5:
             collected_coins -= 5
             attack_bought = True
             attack_level += 1
-            player_attack_damage += 1
+            player_attack_damage += 0.5
             attack_show_tick = 60  # 显示1秒（假设60fps）
         return
     # 大招按钮
     if power_btn.collidepoint(pos):
-        # 购买大招时消耗3金币，释放时不再消耗
-        if not power_bought and collected_coins >= 3:
-            collected_coins -= 3
+        # 购买大招时消耗5金币，释放时不再消耗
+        if not power_bought and collected_coins >= 5:
+            collected_coins -= 5
             power_bought = True
             power_count += 1
             power_show_tick = 60
@@ -541,11 +629,15 @@ def on_mouse_down(pos, button):
 
     # 处理其他鼠标点击事件
     if game_state == GameState.START:
-       if handle_start_click(pos):
-           current_level = 0
-           load_level(current_level)  # 加载地图
-           # 不再重复init_player()，已在load_level中调用
-           game_state = GameState.PLAYING
+        result = handle_start_click(pos)
+        if result == "start":
+            current_level = 0
+            load_level(current_level)  # 加载地图
+            game_state = GameState.PLAYING
+        elif result == "intro":
+            game_state = GameState.INTRO
+        return
+    # ---------------------------------------------------------
 
 # ---------------------------------------------------------
 def trigger_power():
@@ -565,10 +657,20 @@ def on_key_down(key):
     global win_time
     if game_state == GameState.PLAYING and key == keys.SPACE:
         attack(wave_range)
-    # 按J释放大招（需已购买且有次数）
+    # 按J释放大招（需有次数）
     if game_state == GameState.PLAYING and key == keys.J:
         if power_bought and power_count > 0:
             trigger_power()
+    # 在玩法说明界面按空格返回主界面
+    if getattr(GameState, "INTRO", None) and game_state == GameState.INTRO and key == keys.SPACE:
+        game_state = GameState.START
+    # 在暂停界面按空格恢复游戏
+    if getattr(GameState, "PAUSE", None) and game_state == GameState.PAUSE and key == keys.SPACE:
+        game_state = GameState.PLAYING
+    # 在胜利或失败界面按空格返回主界面
+    if game_state in (GameState.WIN, GameState.GAME_OVER) and key == keys.SPACE:
+        game_state = GameState.START
+    #---------------------------------------------------------------------------
     # 测试：按P直接进入boss关
     if key == keys.P:
         current_level = 6
@@ -577,6 +679,7 @@ def on_key_down(key):
     # 测试：按O直接获胜
     if key == keys.O:
         game_state = GameState.WIN
-        win_time = time.time()
+        win_time = time.time()    
 
+# 游戏启动--------------------------------------------------
 pgzrun.go()
