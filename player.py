@@ -183,7 +183,7 @@ def init_player():
 def can_move_to(x, y):
     # 检查目标点是否与任何墙壁重叠，判定略微放宽
     for wx, wy in get_wall_positions():
-        if abs(x - wx) < TILE_SIZE - 15 and abs(y - wy) < TILE_SIZE - 15:
+        if abs(x - wx) < TILE_SIZE - 8 and abs(y - wy) < TILE_SIZE - 8:
             return False
     return True
 

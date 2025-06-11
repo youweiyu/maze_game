@@ -1,13 +1,6 @@
-import os
-import sys
-import time
-import random
-import pgzrun
-import pgzero, pygame
+import os, sys, time, random, pygame, pgzero, pgzrun
 from pgzero.builtins import Actor, keys
-from pgzero.loaders import sounds
-screen : pgzero.screen.Screen
-
+from sound_manager import play_music, play_sound, stop_music
 from config import WIDTH, HEIGHT, game_state, GameState, EXIT_JUMP, TILE_SIZE
 from start_screen import draw_start_screen, handle_start_click, draw_intro_screen
 from player import update_player, draw_player, init_player, get_player_position, attack, update_wave, get_wave_actor, trigger_multi_wave
@@ -17,6 +10,8 @@ from ghost import Ghost
 from boss import update_boss, draw_boss, get_boss, reset_boss
 
 os.environ['SDL_VIDEO_CENTERED'] = '1'
+screen : pgzero.screen.Screen
+
 
 TITLE = '幻影迷宫'
 WIDTH = WIDTH
@@ -25,8 +20,6 @@ clock = pygame.time.Clock()
 
 game_state = game_state
 frame_count = 0  # 帧计数器
-
-# sounds. game_music.play(-1)  # 循环播放背景音乐
 
 EXIT_BUTTON_POS = (WIDTH - 60, 25)
 exit_button = Actor('exit', center=EXIT_BUTTON_POS)
@@ -50,6 +43,7 @@ player_attack_damage = 1  # 玩家攻击伤害
 
 win_time = None  # 记录胜利/失败时刻
 lose_time = None
+current_bg_music_name = None # 新增：记录当前背景音乐名称
 
 # 新增：用于记录每关道具生成状态
 level_item_cache = {}
@@ -76,9 +70,10 @@ power_show_tick = 0  # “已购买”提示计时
 
 player_invincible_tick = 0  # 新增：玩家无敌帧计数
 
-def reset_game_state():
+def reset_game_state(preserve_menu_music=False): # 添加 preserve_menu_music 参数
     global player_lives, collected_coins, wave_range, current_level, blood_pos, coin_positions, bat_wave_pos, ghost, ghost_hurt_cooldown
     global key_pos, has_key, level_item_cache, power_bought, attack_bought, player_attack_damage, attack_level, attack_show_tick, power_count, power_show_tick
+    global win_time, lose_time, current_bg_music_name # 引入 current_bg_music_name
     player_lives = 3
     collected_coins = 0
     wave_range = 1
@@ -90,8 +85,9 @@ def reset_game_state():
     key_pos = None
     has_key = False
     level_item_cache.clear()
-    milk_dragons = get_milk_dragons()
-    milk_dragons.clear()
+    milk_dragons_list = get_milk_dragons() # 获取列表进行操作
+    if milk_dragons_list: # 确保列表存在
+        milk_dragons_list.clear()
     reset_boss()
     ghost_hurt_cooldown = 0
     power_bought = False
@@ -101,55 +97,95 @@ def reset_game_state():
     attack_show_tick = 0
     power_count = 0
     power_show_tick = 0
+    win_time = None
+    lose_time = None
+
+    # 如果 preserve_menu_music 为 True 且 "menu" 音乐正在播放，则不重置音乐
+    if preserve_menu_music and pygame.mixer.music.get_busy() and current_bg_music_name == "menu":
+        pass  # 保留当前播放的音乐
+    else:
+        play_music("menu") # play_music 内部会先 stop
+        current_bg_music_name = "menu"
 
 def load_level(level_index):
     global blood_pos, coin_positions, bat_wave_pos, ghost, key_pos, level_item_cache
+    global current_bg_music_name # 引入 current_bg_music_name
     load_map(levels[level_index])
+    
+    # 音乐播放逻辑根据关卡类型和当前音乐状态决定
+
     if level_index == 6:  # boss关卡
-        milk_dragons.clear()
+        # 如果当前音乐不是 "boss" 或者音乐没有在播放，则播放 "boss" 音乐
+        if current_bg_music_name != "boss" or not pygame.mixer.music.get_busy():
+            play_music("boss")
+            current_bg_music_name = "boss"
+        play_sound("laugh")
+        
+        dragons_list = get_milk_dragons()
+        dragons_list.clear() 
         reset_boss()
         blood_pos = None
         coin_positions.clear()
         bat_wave_pos = None
-        ghost = None
-        key_pos = None
+        ghost = None 
+        key_pos = None 
         init_player()
-    else:
+    else: # 普通关卡
+        # 如果当前音乐不是 "bk" 或者音乐没有在播放，则播放 "bk" 音乐
+        if current_bg_music_name != "bk" or not pygame.mixer.music.get_busy():
+            play_music("bk")
+            current_bg_music_name = "bk"
+        play_sound("level") # 关卡切换音效仍然播放
+        
         # --------- 只生成一次道具，缓存到level_item_cache ----------
         if level_index not in level_item_cache:
             tiles = get_tiles()
-            walkable_tiles = [t for t in tiles if hasattr(t, 'char') and t.char in ('G', 'Y', 'I')]
-            # 随机生成一个血包
-            if walkable_tiles:
-                blood_tile = random.choice(walkable_tiles)
-                _blood_pos = (blood_tile.x, blood_tile.y)
-            else:
-                _blood_pos = None
-            # 随机生成10个金币
+            
+            # 确定钥匙位置 (固定，由地图 'k' 决定)
+            key_tile_obj = next((t for t in tiles if hasattr(t, 'char') and t.char == 'k'), None)
+            _key_pos = (key_tile_obj.x, key_tile_obj.y) if key_tile_obj else None
+
+            # 获取所有可随机生成道具的格子 ('G', 'Y', 'I')
+            potential_spawn_tiles = [t for t in tiles if hasattr(t, 'char') and t.char in ('G', 'Y', 'I')]
+            
+            # 如果钥匙存在，则从潜在生成点中移除钥匙所在的格子
+            if _key_pos:
+                potential_spawn_tiles = [t for t in potential_spawn_tiles if (t.x, t.y) != _key_pos]
+            
+            random.shuffle(potential_spawn_tiles) # 打乱顺序以随机分配
+
+            _blood_pos = None
+            _bat_wave_pos = None
             _coin_positions = []
-            if walkable_tiles:
-                coin_tiles = random.sample(walkable_tiles, min(15, len(walkable_tiles)))
-                for t in coin_tiles:
-                    _coin_positions.append((t.x, t.y))
-            # 随机生成一个bat_wave道具
-            if walkable_tiles:
-                bat_wave_tile = random.choice(walkable_tiles)
-                _bat_wave_pos = (bat_wave_tile.x, bat_wave_tile.y)
-            else:
-                _bat_wave_pos = None
-            # 钥匙位置直接取地图中k字符
-            key_tile = next((t for t in tiles if hasattr(t, 'char') and t.char == 'k'), None)
-            _key_pos = (key_tile.x, key_tile.y) if key_tile else None
-            # 存储副本，避免引用同一个对象
+
+            # 生成血包
+            if potential_spawn_tiles:
+                spawn_tile = potential_spawn_tiles.pop()
+                _blood_pos = (spawn_tile.x, spawn_tile.y)
+            
+            # 生成bat_wave道具
+            if potential_spawn_tiles:
+                spawn_tile = potential_spawn_tiles.pop()
+                _bat_wave_pos = (spawn_tile.x, spawn_tile.y)
+
+            # 生成金币 (最多15个，或剩余可用格子数)
+            num_coins_to_spawn = min(15, len(potential_spawn_tiles))
+            for _ in range(num_coins_to_spawn):
+                if potential_spawn_tiles: # 再次检查以防万一
+                    spawn_tile = potential_spawn_tiles.pop()
+                    _coin_positions.append((spawn_tile.x, spawn_tile.y))
+                else:
+                    break # 没有更多格子可用
+
+            # 存储到缓存
             level_item_cache[level_index] = {
                 'blood_pos': _blood_pos,
-                'coin_positions': list(_coin_positions),
+                'coin_positions': list(_coin_positions), # 确保是副本
                 'bat_wave_pos': _bat_wave_pos,
-                'key_pos': _key_pos
+                'key_pos': _key_pos # 钥匙位置（可能为None）
             }
         # 读取缓存（只生成一次道具）
         item = level_item_cache[level_index]
-        # 关键：每次进入关卡都要拷贝一份道具状态，不能直接引用缓存
         blood_pos = item['blood_pos']
         coin_positions.clear()
         coin_positions.extend(item['coin_positions'])
@@ -157,15 +193,21 @@ def load_level(level_index):
         key_pos = item.get('key_pos', None)
         init_player()
         ghost = Ghost(get_player_position())
-        spawn_dragons(n=10)
+        spawn_dragons(n=10) 
+    # 移除末尾统一的音乐播放调用
 
 def draw():
     global game_state, current_level, player_lives, blood_pos, coin_positions, collected_coins, bat_wave_pos, key_pos, has_key
     global power_bought, attack_bought, attack_level, attack_show_tick, power_count, power_show_tick
     screen.clear()
     if game_state == GameState.START:
+        # 只在音乐未播放时播放menu音乐
+        if not pygame.mixer.music.get_busy():
+            play_music("menu")
         draw_start_screen(screen)
     elif getattr(GameState, "INTRO", None) and game_state == GameState.INTRO:
+        if not pygame.mixer.music.get_busy():
+            play_music("menu")
         draw_intro_screen(screen)
     elif getattr(GameState, "PAUSE", None) and game_state == GameState.PAUSE:
         # 暂停时先绘制游戏画面
@@ -325,19 +367,31 @@ def draw():
         if power_show_tick > 0:
             screen.draw.text("已购买", center=(POWER_BTN_POS[0]+80, POWER_BTN_POS[1]), fontsize=32, color="#1a67aa", fontname="s")
     elif game_state == GameState.WIN:
+        # 立即播放胜利音乐
+        if not hasattr(draw, "_win_music_played") or not draw._win_music_played:
+            play_sound("win")  # 先播放音效
+            stop_music()
+            draw._win_music_played = True
         bg = Actor('start_bk', center=(WIDTH//2, HEIGHT//2))
         bg.draw()
         win_img = Actor('youwin', center=(WIDTH//2, HEIGHT//2 - 70))
         win_img.draw()
-        # 新增：胜利时提示
         screen.draw.text("按空格键返回主界面", center=(WIDTH//2, HEIGHT//2+250), fontsize=60, color="white", fontname="s")
     elif game_state == GameState.GAME_OVER:
+        # 立即播放失败音乐
+        if not hasattr(draw, "_lose_music_played") or not draw._lose_music_played:
+            play_sound("lose")  # 先播放音效
+            stop_music()
+            draw._lose_music_played = True
         screen.fill((0, 0, 0))
         bg = Actor('start_bk', center=(WIDTH//2, HEIGHT//2))
         bg.draw()
         screen.draw.text('You Lose!', center=(WIDTH//2, HEIGHT//2 - 50), fontsize=180, color="red", fontname="s")
-        # 新增：失败时提示
         screen.draw.text("按空格键返回主界面", center=(WIDTH//2, HEIGHT//2+120), fontsize=60, color="white", fontname="s")
+    else:
+        # 只要不是win/lose界面，重置标志
+        draw._win_music_played = False
+        draw._lose_music_played = False
 
     # 始终绘制右上角退出按钮和暂停按钮
     exit_button.draw()
@@ -351,11 +405,17 @@ def update():  # 更新模块，每帧重复操作
 
     # 1. 先处理游戏状态（START/WIN/GAME_OVER/INTRO/PAUSE），如需 return 则直接返回
     if game_state == GameState.START:
-        win_time = None
-        lose_time = None
-        reset_game_state()
-        return
+        # win_time 和 lose_time 的重置已移至 reset_game_state()
+        # reset_game_state() 不应在此处每帧调用
+        
+        # 确保菜单音乐正在播放 (它应该由 reset_game_state() 在进入此状态时启动)
+        if not pygame.mixer.music.get_busy():
+            play_music("menu")
+        return # START 状态下通常只绘制界面，不进行其他更新
     if getattr(GameState, "INTRO", None) and game_state == GameState.INTRO:
+        # 确保玩法说明界面也播放menu音乐
+        if not pygame.mixer.music.get_busy():
+            play_music("menu")
         return
     if getattr(GameState, "PAUSE", None) and game_state == GameState.PAUSE:
         return
@@ -470,48 +530,63 @@ def update():  # 更新模块，每帧重复操作
     player_x, player_y = get_player_position()
     if blood_pos:
         if abs(player_x - blood_pos[0]) < TILE_SIZE//2 and abs(player_y - blood_pos[1]) < TILE_SIZE//2:
+            play_sound("spend")
             if player_lives < max_lives:
                 player_lives += 1
-            # 关键：同步缓存，防止再次进入关卡血包又出现
-            for k, v in level_item_cache.items():
-                if v['blood_pos'] == blood_pos:
-                    v['blood_pos'] = None
-            blood_pos = None
+            
+            # 更新缓存中当前关卡的血包状态
+            if current_level in level_item_cache:
+                level_item_cache[current_level]['blood_pos'] = None
+            blood_pos = None # 清除当前关卡的血包实例
 
     # 玩家拾取bat_wave道具
     if bat_wave_pos:
         if abs(player_x - bat_wave_pos[0]) < TILE_SIZE//2 and abs(player_y - bat_wave_pos[1]) < TILE_SIZE//2:
+            play_sound("spend")
             if wave_range < 4:
                 wave_range += 1
-            for k, v in level_item_cache.items():
-                if v['bat_wave_pos'] == bat_wave_pos:
-                    v['bat_wave_pos'] = None
-            bat_wave_pos = None
+            
+            # 更新缓存中当前关卡的bat_wave道具状态
+            if current_level in level_item_cache:
+                level_item_cache[current_level]['bat_wave_pos'] = None
+            bat_wave_pos = None # 清除当前关卡的bat_wave道具实例
 
     # 玩家拾取钥匙
-    if key_pos and not has_key:
+    if key_pos and not has_key: # not has_key 确保全局只拾取一次钥匙
         if abs(player_x - key_pos[0]) < TILE_SIZE//2 and abs(player_y - key_pos[1]) < TILE_SIZE//2:
-            has_key = True
-            for k, v in level_item_cache.items():
-                if v['key_pos'] == key_pos:
-                    v['key_pos'] = None
-            key_pos = None
+            play_sound("level")
+            has_key = True # 全局标记已获得钥匙
+            
+            # 更新缓存中当前关卡的钥匙状态（主要为了视觉上不再显示）
+            if current_level in level_item_cache and 'key_pos' in level_item_cache[current_level]:
+                 level_item_cache[current_level]['key_pos'] = None
+            key_pos = None # 清除当前关卡的钥匙实例
 
     # 玩家拾取金币
-    new_coin_positions = []
-    for pos in coin_positions:
+    # new_coin_positions 用于更新当前帧的活动金币列表
+    new_coin_positions_for_current_frame = []
+    # collected_this_frame_coords 用于记录本帧收集到的金币坐标，以便从缓存中移除
+    collected_this_frame_coords = []
+
+    for pos in coin_positions: # coin_positions 是当前关卡活动金币的列表
         if abs(player_x - pos[0]) < TILE_SIZE//2 and abs(player_y - pos[1]) < TILE_SIZE//2:
-            collected_coins += 1
-            # 关键：同步缓存，防止再次进入关卡金币又出现
-            for k, v in level_item_cache.items():
-                if pos in v['coin_positions']:
-                    v['coin_positions'].remove(pos)
+            play_sound("coin")
+            collected_coins += 1 # 增加总金币数
+            collected_this_frame_coords.append(pos) # 记录此金币已被收集
         else:
-            new_coin_positions.append(pos)
-    coin_positions = new_coin_positions
+            new_coin_positions_for_current_frame.append(pos) # 未收集的金币保留
+    coin_positions = new_coin_positions_for_current_frame # 更新当前关卡的活动金币列表
+
+    # 从 level_item_cache 中移除本帧收集到的金币
+    if current_level in level_item_cache and 'coin_positions' in level_item_cache[current_level]:
+        cached_level_coins = level_item_cache[current_level]['coin_positions']
+        for collected_pos in collected_this_frame_coords:
+            if collected_pos in cached_level_coins:
+                cached_level_coins.remove(collected_pos) # 直接修改缓存中的列表
 
     # 出口判定
     tiles = get_tiles()
+    next_level = None
     for tile in tiles:
         if hasattr(tile, 'char'):
             jump_dict = EXIT_JUMP.get(current_level + 1, {})
@@ -521,12 +596,15 @@ def update():  # 更新模块，每帧重复操作
                 is_boss_entry = (jump_dict[tile.char] - 1 == 6)
                 if abs(player_x - tile.x) < 10 and abs(player_y - tile.y) < 10:
                     if is_boss_entry and not has_key:
-                        # 没有钥匙不能进boss关卡
                         continue
-                    current_level = jump_dict[tile.char] - 1
-                    load_level(current_level)
-                    game_state = GameState.PLAYING
+                    next_level = jump_dict[tile.char] - 1
                     break
+    if next_level is not None:
+        # 立即切换关卡和状态，音效/音乐异步
+        current_level = next_level
+        load_level(current_level)
+        game_state = GameState.PLAYING
+        return  # 立即返回，避免后续逻辑干扰
 
     # 声波攻击奶龙（修正判定，确保用rect）
     wave = get_wave_actor()
@@ -555,6 +633,7 @@ def update():  # 更新模块，每帧重复操作
             player_lives -= 1
             dragon.alive = False
             dragon.blowup_tick = 0
+            play_sound("explosion")
             if player_lives <= 0:
                 game_state = GameState.GAME_OVER
             break
@@ -567,6 +646,7 @@ def update():  # 更新模块，每帧重复操作
             ghost.alive = False
             ghost.blowup_tick = 0
             ghost_hurt_cooldown = 30  # 0.5秒冷却（假设60fps）
+            play_sound("explosion")
             if player_lives <= 0:
                 game_state = GameState.GAME_OVER
     if ghost_hurt_cooldown > 0:
@@ -580,12 +660,14 @@ def on_mouse_move(pos, rel, buttons):  # 当鼠标移动时执行
 
 # ---------------------------------------------------------
 def on_mouse_down(pos, button):
-    global game_state, current_level, collected_coins, power_bought, attack_bought, player_attack_damage, attack_level, attack_show_tick, power_count, power_show_tick
+    global game_state, current_level, collected_coins, power_bought, attack_bought, player_attack_damage, attack_level, attack_show_tick, power_count, power_show_tick, current_bg_music_name # 添加 current_bg_music_name
     # 检查是否点击退出按钮
     if exit_button.collidepoint(pos):
+        play_sound("click")
         sys.exit()
     # 检查是否点击暂停按钮
     if stop_btn.collidepoint(pos):
+        play_sound("click")
         if game_state == GameState.PLAYING:
             game_state = GameState.PAUSE
         return
@@ -597,18 +679,20 @@ def on_mouse_down(pos, button):
             attack_level += 1
             player_attack_damage += 0.5
             attack_show_tick = 60  # 显示1秒（假设60fps）
+            play_sound("spend")
         return
     # 大招按钮
     if power_btn.collidepoint(pos):
-        # 购买大招时消耗5金币，释放时不再消耗
         if not power_bought and collected_coins >= 5:
             collected_coins -= 5
             power_bought = True
             power_count += 1
             power_show_tick = 60
+            play_sound("spend")
         elif power_bought:
             power_count += 1
             power_show_tick = 60
+            play_sound("spend")
         return
     # -----------测试阶段：点击顶部关卡图标切换关卡-----------
     icon_y = 25
@@ -620,6 +704,7 @@ def on_mouse_down(pos, button):
         icon_x = start_x + i * (icon_size + gap)
         # 以图标中心为圆心，半径30像素为点击区域
         if (pos[0] - icon_x) ** 2 + (pos[1] - icon_y) ** 2 < 30 ** 2:
+            play_sound("click")
             current_level = i
             load_level(current_level)
             game_state = GameState.PLAYING
@@ -630,11 +715,17 @@ def on_mouse_down(pos, button):
     if game_state == GameState.START:
         result = handle_start_click(pos)
         if result == "start":
+            play_sound("click")
             current_level = 0
-            load_level(current_level)  # 加载地图
+            load_level(current_level)  # load_level 会处理音乐
             game_state = GameState.PLAYING
         elif result == "intro":
+            play_sound("click")
             game_state = GameState.INTRO
+            # 确保进入 INTRO 界面时，如果 menu 音乐没在播放，则播放
+            if not pygame.mixer.music.get_busy() or current_bg_music_name != "menu":
+                play_music("menu")
+                current_bg_music_name = "menu"
         return
     # ---------------------------------------------------------
 
@@ -644,30 +735,63 @@ def trigger_power():
     if not power_bought or power_count <= 0:
         return  # 未购买或无次数不能释放
     power_count -= 1
-    # 普通关卡和boss关卡都触发八方向AOE
+    play_sound("whoosh")
     trigger_multi_wave(wave_range)
 
 def trigger_boss_wave():
-    # boss关卡，j键/大招按钮触发八方向声波
+    play_sound("whoosh")
     trigger_multi_wave(wave_range)
 
 def on_key_down(key):
     global collected_coins, power_bought, power_count, current_level, game_state
-    global win_time
+    global win_time, attack_bought, attack_level, player_attack_damage, attack_show_tick, power_show_tick, current_bg_music_name # 引入 current_bg_music_name
     if game_state == GameState.PLAYING and key == keys.SPACE:
         attack(wave_range)
+        play_sound("whoosh")
     # 按J释放大招（需有次数）
     if game_state == GameState.PLAYING and key == keys.J:
         if power_bought and power_count > 0:
             trigger_power()
+    # 数字1购买攻击力
+    if game_state == GameState.PLAYING and key == keys.K_1:
+        if collected_coins >= 5:
+            collected_coins -= 5
+            attack_bought = True
+            attack_level += 1
+            player_attack_damage += 0.5
+            attack_show_tick = 60
+            play_sound("spend")
+    # 数字2购买大招
+    if game_state == GameState.PLAYING and key == keys.K_2:
+        if not power_bought and collected_coins >= 5:
+            collected_coins -= 5
+            power_bought = True
+            power_count += 1
+            power_show_tick = 60
+            play_sound("spend")
+        elif power_bought: # power_bought is True, so we can just add to power_count
+            if collected_coins >=5: # Check if enough coins to buy more
+                collected_coins -=5
+                power_count += 1
+                power_show_tick = 60
+                play_sound("spend")
+            else: # Not enough coins, maybe play a different sound or show a message
+                pass 
+
     # 在玩法说明界面按空格返回主界面
     if getattr(GameState, "INTRO", None) and game_state == GameState.INTRO and key == keys.SPACE:
+        play_sound("click")
+        # 调用 reset_game_state 时传入 preserve_menu_music=True
+        reset_game_state(preserve_menu_music=True) 
         game_state = GameState.START
     # 在暂停界面按空格恢复游戏
     if getattr(GameState, "PAUSE", None) and game_state == GameState.PAUSE and key == keys.SPACE:
+        play_sound("click")
         game_state = GameState.PLAYING
     # 在胜利或失败界面按空格返回主界面
     if game_state in (GameState.WIN, GameState.GAME_OVER) and key == keys.SPACE:
+        play_sound("click")
+        reset_game_state() # 默认 preserve_menu_music 为 False，会重置音乐为 menu
         game_state = GameState.START
     #---------------------------------------------------------------------------
     # 测试：按P直接进入boss关
@@ -681,4 +805,6 @@ def on_key_down(key):
         win_time = time.time()    
 
 # 游戏启动--------------------------------------------------
+# game_state 默认为 GameState.START
+reset_game_state() # 游戏启动时调用一次以初始化 START 状态和音乐
 pgzrun.go()

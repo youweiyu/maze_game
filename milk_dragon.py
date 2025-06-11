@@ -4,6 +4,7 @@ from player import get_player_position
 from map_loader import get_tiles
 import pygame
 from config import TILE_SIZE, Dragon_SPEED
+from sound_manager import play_sound
 
 WALK_FRAMES = [f'walk_{i}' for i in range(9)]
 DRAGON_SPEED = Dragon_SPEED
@@ -35,6 +36,8 @@ class MilkDragon:
 
     def update(self, frame_count):
         if not self.alive:
+            if self.blowup_tick == 0:
+                play_sound("explosion")  # 新增：爆炸音效
             self.blowup_tick += 1
             if self.blowup_tick > 15:  # 爆炸特效持续15帧
                 self.alive = 'remove'

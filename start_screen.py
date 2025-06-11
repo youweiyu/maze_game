@@ -1,5 +1,7 @@
 from config import WIDTH, HEIGHT
 from pgzero.builtins import Actor
+from sound_manager import play_music
+import pygame
 
 background = Actor('start_bk', (WIDTH // 2, HEIGHT // 2))
 intro = Actor('introduction', (70, 60))
@@ -10,10 +12,21 @@ cursor_pos = (WIDTH // 2, HEIGHT // 2 + 250)
 start_button = Actor('start', center=button_pos)
 
 def draw_start_screen(screen):
+    # 确保主菜单音乐
+    if not pygame.mixer.music.get_busy():
+        play_music("menu")
     background.draw()
     start_button.draw()
     # 绘制intro图标
     intro.draw()
+
+    # 绘制指向“玩法说明”图标的光标
+    intro_cursor = Actor('cursor_click')
+    intro_cursor.center = (intro.centerx + 90, intro.centery)
+    intro_cursor.angle = 90
+    intro_cursor.draw()
+
+    # 指向开始按钮的光标 (原有的)
     cursor = Actor('cursor_click', center=cursor_pos)
     cursor.draw()
     # 五个字分别用不同颜色
@@ -34,7 +47,7 @@ def draw_intro_screen(screen):
         ("1. 方向键/WASD控制角色移动", "lime"),
         ("2. 空格键释放声波攻击，攻击距离可提升", "gold"),
         ("3. J键释放大招（八方向AOE）", "magenta"),
-        ("4. 点击左侧图标可以提升攻击力（单剑）/充能大招（双剑）", "orange"),
+        ("4. 按1可购买提升攻击力（单剑）/按2购买充能大招（双剑）", "orange"),
         ("5. 拾取血包可恢复生命，拾取蝙蝠提升攻击距离", "deepskyblue"),
         ("6. 迷宫共六面，寻找到钥匙后可打开Boss关的大门", "violet"),
         ("7. 躲避奶龙、鬼魂和Boss火球，生命归零游戏失败", "red"),

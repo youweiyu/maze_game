@@ -3,7 +3,7 @@ from config import WIDTH, HEIGHT, TILE_SIZE
 from ghost import Ghost
 import pygame
 import random
-import math
+from sound_manager import play_sound
 
 class Fireball:
     def __init__(self, x, y, dx, dy):
@@ -18,6 +18,7 @@ class Fireball:
         self.blowup = False
         self.blowup_tick = 0
         self.flip_x = dx > 0
+        self.sound_played = False
 
     def update(self):
         if self.blowup:
@@ -36,9 +37,13 @@ class Fireball:
                 self.blowup = True
                 self.blowup_tick = 0
                 self.actor.image = 'blowup'
+                play_sound("explosion")
                 return
 
     def draw(self):
+        if not self.sound_played and not self.blowup:
+            play_sound("fireball")
+            self.sound_played = True
         if self.blowup:
             self.actor.image = 'blowup'
         else:
