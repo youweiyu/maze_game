@@ -245,10 +245,13 @@ def draw_player():
         wave_actor.draw()
     # 新增：绘制多方向声波
     if multi_wave_active:
-        actors = get_wave_actor()
-        if actors:
-            for a in actors:
-                a.draw()
+        actors_list = get_wave_actor()
+        if actors_list:
+            for item in actors_list:
+                if hasattr(item, 'draw'):
+                    item.draw()
+                else:
+                    pass
 
 def get_player_position():
     return player.x, player.y

@@ -194,7 +194,6 @@ def load_level(level_index):
         init_player()
         ghost = Ghost(get_player_position())
         spawn_dragons(n=10) 
-    # 移除末尾统一的音乐播放调用
 
 def draw():
     global game_state, current_level, player_lives, blood_pos, coin_positions, collected_coins, bat_wave_pos, key_pos, has_key
