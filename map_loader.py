@@ -43,5 +43,3 @@ def get_wall_positions():
 
 def get_tiles():
     return tiles
-
-# 代码无需更改，道具生成已由主逻辑level_item_cache控制
