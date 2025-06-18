@@ -16,8 +16,8 @@ wave_active = False
 wave_frame = 0
 wave_actor = None
 wave_direction = 'left'
-wave_tick = 0  #用于控制声波推进速度
-wave_max_range = 1  # 新增，最大攻击距离
+wave_tick = 0  # 用于控制声波推进速度
+wave_max_range = 1  # 最大攻击距离
 
 def attack(wave_range=1):
     global wave_active, wave_frame, wave_direction, wave_max_range
@@ -61,7 +61,7 @@ def update_wave_actor():
     elif wave_direction == 'down':
         wave_actor.angle = 90
 
-# 新增：多方向声波
+# 多方向声波
 multi_wave_active = False
 # 八方向
 multi_wave_dirs = ['left', 'right', 'up', 'down', 'upleft', 'upright', 'downleft', 'downright']
