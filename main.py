@@ -401,6 +401,7 @@ def update():  # 更新模块，每帧重复操作
     global player_frame_index, frame_count, game_state, current_level, player_lives, blood_pos, coin_positions, collected_coins, bat_wave_pos, wave_range, ghost, ghost_hurt_cooldown
     global win_time, lose_time, key_pos, has_key, attack_show_tick, power_show_tick
     global player_invincible_tick
+    global current_bg_music_name  # 新增
 
     # 1. 先处理游戏状态（START/WIN/GAME_OVER/INTRO/PAUSE），如需 return 则直接返回
     if game_state == GameState.START:
@@ -422,7 +423,15 @@ def update():  # 更新模块，每帧重复操作
     if game_state == GameState.WIN:
         return
     if game_state == GameState.GAME_OVER:
+        # 死亡时立即停止背景音乐并播放lose音效（只播放一次）
+        if not hasattr(update, "_lose_music_played") or not update._lose_music_played:
+            stop_music()
+            play_sound("lose")
+            update._lose_music_played = True
         return
+
+    # 只要不是GAME_OVER，重置标志
+    update._lose_music_played = False
 
     # 2. 递增帧数，更新玩家、声波、怪物、鬼魂
     frame_count += 1
